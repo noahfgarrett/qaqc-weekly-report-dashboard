@@ -7,6 +7,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.0.2',
+    date: '2026-07-09T19:00:00Z',
+    type: 'fix',
+    notes: [
+      'Update modal now downloads the packaged HTML file directly instead of opening a new browser tab',
+      'Download button and status copy now make it clear that the update is a single HTML app file',
+    ],
+  },
+  {
     version: '1.0.1',
     date: '2026-07-09T18:00:00Z',
     type: 'fix',

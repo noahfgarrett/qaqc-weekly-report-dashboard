@@ -1149,6 +1149,23 @@ select:disabled {
   margin: 0 0 8px;
 }
 
+.download-hint {
+  background: rgba(20, 184, 166, 0.1);
+  border: 1px solid rgba(20, 184, 166, 0.22);
+  border-radius: 16px;
+  color: #0f766e;
+  font-size: 12px;
+  font-weight: 850;
+  margin: 0;
+  padding: 10px 12px;
+}
+
+.download-hint.error {
+  background: rgba(240, 82, 82, 0.1);
+  border-color: rgba(240, 82, 82, 0.22);
+  color: #9f1239;
+}
+
 .changelog-list {
   display: grid;
   gap: 10px;

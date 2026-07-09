@@ -13,7 +13,7 @@ Premium HTML dashboard for Smartsheet-backed weekly QA/QC reporting.
 - Defaults OAC reporting to all work weeks through the previous completed work week.
 - Provides slicers for Work Week, Discipline, Contractor, Subtype, and Status.
 - Exports a GC-safe three-slide report deck as PPTX or PDF.
-- Checks GitHub Releases for HTML app updates.
+- Checks release metadata for packaged HTML app updates and downloads the new HTML file directly.
 
 ## Local Development
 
@@ -41,7 +41,7 @@ outputs/QAQC-Weekly-Report-Dashboard.html
 3. Create a GitHub release tag.
 4. Attach `outputs/QAQC-Weekly-Report-Dashboard.html` to the release.
 
-The in-app updater expects the latest GitHub release to include an `.html` asset.
+The in-app updater expects the latest release to include an `.html` asset. The modal downloads that asset directly as a browser download; users do not need to open GitHub.
 
 ## Security
 

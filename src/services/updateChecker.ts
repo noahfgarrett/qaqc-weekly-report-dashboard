@@ -47,11 +47,10 @@ export async function checkForUpdate(): Promise<UpdateInfo | null> {
 }
 
 export async function downloadUpdate(info: UpdateInfo): Promise<void> {
+  const downloadUrl = info.htmlDownloadUrl ?? info.downloadUrl
   const a = document.createElement('a')
-  a.href = info.htmlDownloadUrl ?? info.downloadUrl
+  a.href = downloadUrl
   a.download = info.assetName
-  a.target = '_blank'
-  a.rel = 'noopener noreferrer'
   document.body.appendChild(a)
   a.click()
   document.body.removeChild(a)

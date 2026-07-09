@@ -210,9 +210,15 @@ function UpdateModal({
 }) {
   const [tab, setTab] = useState<'update' | 'changelog'>(info ? 'update' : 'changelog')
   const [downloading, setDownloading] = useState(false)
+  const [downloadMessage, setDownloadMessage] = useState<string | null>(null)
+  const [downloadError, setDownloadError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (open) setTab(info ? 'update' : 'changelog')
+    if (open) {
+      setTab(info ? 'update' : 'changelog')
+      setDownloadMessage(null)
+      setDownloadError(null)
+    }
   }, [open, info])
 
   return (
@@ -243,6 +249,9 @@ function UpdateModal({
                 <p key={line}>{line.replace(/^[-#* ]+/, '')}</p>
               ))}
           </div>
+          <p className={cx('download-hint', downloadError && 'error')}>
+            {downloadError ?? downloadMessage ?? `${info.assetName} will download directly to your browser downloads folder.`}
+          </p>
           <div className="modal-actions">
             <button className="button secondary" type="button" onClick={onClose}>
               Later
@@ -253,12 +262,20 @@ function UpdateModal({
               disabled={downloading}
               onClick={async () => {
                 setDownloading(true)
-                await downloadUpdate(info)
-                setDownloading(false)
+                setDownloadError(null)
+                setDownloadMessage(null)
+                try {
+                  await downloadUpdate(info)
+                  setDownloadMessage(`${info.assetName} is downloading.`)
+                } catch (err) {
+                  setDownloadError(err instanceof Error ? err.message : 'Unable to download this update.')
+                } finally {
+                  setDownloading(false)
+                }
               }}
             >
               {downloading ? <RefreshCw size={16} className="spin" /> : <Download size={16} />}
-              Download v{info.version}
+              Download HTML v{info.version}
             </button>
           </div>
         </div>
