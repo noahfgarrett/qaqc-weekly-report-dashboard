@@ -1,0 +1,11 @@
+node_modules/
+dist/
+outputs/
+work/
+tmp/
+.playwright-mcp/
+*.tsbuildinfo
+vite.config.js
+vite.config.d.ts
+qaqc-*.png
+.DS_Store
