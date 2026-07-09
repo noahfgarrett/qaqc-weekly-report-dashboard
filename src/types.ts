@@ -17,7 +17,7 @@ export interface SheetRecord {
 }
 
 export interface SheetBundle {
-  source: 'demo' | 'smartsheet'
+  source: 'empty' | 'demo' | 'smartsheet'
   sheets: Record<SheetRole, SheetRecord>
 }
 
@@ -116,7 +116,7 @@ export interface ReportModel {
   reportWeek: WorkWeek
   previousReportWeek: WorkWeek
   cutoffDate: Date
-  source: 'demo' | 'smartsheet'
+  source: 'empty' | 'demo' | 'smartsheet'
   sheetHealth: Record<SheetRole, boolean>
   filterOptions: FilterOptions
   activeFilters: ReportFilters

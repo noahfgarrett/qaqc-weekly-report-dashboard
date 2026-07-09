@@ -46,7 +46,7 @@ function addHeader(slide: pptxgen.Slide, title: string, report: ReportModel): vo
   })
   const pills = [
     `OAC Through ${report.reportWeek.label}`,
-    report.source === 'smartsheet' ? 'Smartsheet Live' : 'Demo Data',
+    report.source === 'smartsheet' ? 'Smartsheet Live' : 'Preview Layout',
     `Report Week ${report.reportWeek.label}`,
   ]
   pills.forEach((pill, index) => {

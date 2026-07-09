@@ -7,6 +7,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.0.1',
+    date: '2026-07-09T18:00:00Z',
+    type: 'fix',
+    notes: [
+      'App now opens on a clean Smartsheet connection screen instead of loading demo report data automatically',
+      'Preview data is available only through the explicit Preview Layout button',
+      'Report canvas and chart spacing were widened, and the sheet-mapping rail now collapses after a report loads so charts have more room',
+    ],
+  },
+  {
     version: '1.0.0',
     date: '2026-07-09T12:00:00Z',
     type: 'major',

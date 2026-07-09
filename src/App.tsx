@@ -18,6 +18,8 @@ import {
   LineChart,
   Link2,
   LockKeyhole,
+  PanelLeftClose,
+  PanelLeftOpen,
   RefreshCw,
   Search,
   ShieldCheck,
@@ -57,6 +59,7 @@ import type {
   MonthlyIssuePoint,
   ReportFilters,
   SheetBundle,
+  SheetRecord,
   SheetRole,
   SmartSheetSummary,
   UpdateInfo,
@@ -73,7 +76,25 @@ const ROLE_CONFIG: Record<SheetRole, { label: string; icon: typeof AlertCircle; 
   welding: { label: 'Welding Signoffs', icon: Wrench, color: '#22c55e' },
 }
 
-const DEFAULT_BUNDLE = buildSampleBundle()
+function emptySheet(name: string): SheetRecord {
+  return {
+    id: name,
+    name,
+    rows: [],
+  }
+}
+
+const EMPTY_BUNDLE: SheetBundle = {
+  source: 'empty',
+  sheets: {
+    bimIssues: emptySheet('BIM Issues Log'),
+    mechanical: emptySheet('Mechanical / Process Inspection Log'),
+    electrical: emptySheet('Electrical Inspection Log'),
+    welding: emptySheet('Welding Signoffs by Work Week'),
+  },
+}
+
+const PREVIEW_BUNDLE = buildSampleBundle()
 
 function cx(...classes: Array<string | false | null | undefined>): string {
   return classes.filter(Boolean).join(' ')
@@ -561,7 +582,7 @@ function OverviewSlide({ report, exportable }: { report: ReturnType<typeof build
     <SlideShell title="Weekly QA/QC Report" icon={<Gauge size={18} />} exportable={exportable}>
       <div className="report-pills">
         <span>OAC Through {report.reportWeek.label}</span>
-        <span>{report.source === 'smartsheet' ? 'Smartsheet Live' : 'Demo Data'}</span>
+        <span>{report.source === 'smartsheet' ? 'Smartsheet Live' : 'Preview Layout'}</span>
         <span>Report Week {report.reportWeek.label}</span>
       </div>
       <div className="kpi-grid">
@@ -693,6 +714,44 @@ function FieldSlide({ report, exportable }: { report: ReturnType<typeof buildRep
   )
 }
 
+function ConnectFirst({
+  onConnect,
+  onPreview,
+  loading,
+}: {
+  onConnect: () => void
+  onPreview: () => void
+  loading: boolean
+}) {
+  return (
+    <section className="connect-first">
+      <div className="connect-first-mark">
+        <Database size={34} />
+      </div>
+      <h2>Connect Smartsheet to generate the weekly report</h2>
+      <p>
+        The released app now starts clean. Once your token is saved, it will reconnect on launch and load the dashboard automatically.
+      </p>
+      <div className="connect-first-actions">
+        <button className="button primary" type="button" onClick={onConnect}>
+          <KeyRound size={16} />
+          Connect Smartsheet
+        </button>
+        <button className="button secondary" type="button" onClick={onPreview} disabled={loading}>
+          <LineChart size={16} />
+          Preview Layout
+        </button>
+      </div>
+      <div className="connect-first-grid">
+        <span>BIM Issues Log</span>
+        <span>Mechanical / Process Inspection Log</span>
+        <span>Electrical Inspection Log</span>
+        <span>Welding Signoffs</span>
+      </div>
+    </section>
+  )
+}
+
 function SheetPanel({
   sheets,
   mapping,
@@ -769,13 +828,14 @@ function SheetPanel({
 }
 
 export default function App() {
-  const [bundle, setBundle] = useState<SheetBundle>(DEFAULT_BUNDLE)
+  const [bundle, setBundle] = useState<SheetBundle>(EMPTY_BUNDLE)
   const [filters, setFilters] = useState<ReportFilters>(() => mergeFilters(loadFilters()))
   const [activeSlide, setActiveSlide] = useState<'overview' | 'issues' | 'field'>('overview')
   const [connectOpen, setConnectOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [pdfExporting, setPdfExporting] = useState(false)
+  const [sheetPanelOpen, setSheetPanelOpen] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [sheets, setSheets] = useState<SmartSheetSummary[]>([])
   const [sheetSearch, setSheetSearch] = useState('')
@@ -785,6 +845,8 @@ export default function App() {
   const tokenMeta = loadTokenMeta()
   const savedToken = loadSmartsheetToken()
   const connected = bundle.source === 'smartsheet'
+  const hasReport = bundle.source === 'smartsheet' || bundle.source === 'demo'
+  const showSheetPanel = !hasReport || sheetPanelOpen
 
   const report = useMemo(() => buildReportModel(bundle, filters, new Date()), [bundle, filters])
 
@@ -812,7 +874,7 @@ export default function App() {
       const nextBundle: SheetBundle = {
         source: 'smartsheet',
         sheets: {
-          ...DEFAULT_BUNDLE.sheets,
+          ...EMPTY_BUNDLE.sheets,
           ...loaded,
         },
       }
@@ -821,6 +883,7 @@ export default function App() {
       setMapping(autoMapping)
       saveSheetMapping(autoMapping)
       setBundle(nextBundle)
+      setSheetPanelOpen(false)
       setConnectOpen(false)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to connect to Smartsheet.')
@@ -854,7 +917,7 @@ export default function App() {
       const loaded = await loadMappedSheets(token, next)
       setBundle({
         source: 'smartsheet',
-        sheets: { ...DEFAULT_BUNDLE.sheets, ...loaded },
+        sheets: { ...EMPTY_BUNDLE.sheets, ...loaded },
       })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to load mapped sheet.')
@@ -865,8 +928,9 @@ export default function App() {
 
   function clearAuth(): void {
     clearSmartsheetToken()
-    setBundle(DEFAULT_BUNDLE)
+    setBundle(EMPTY_BUNDLE)
     setSheets([])
+    setSheetPanelOpen(true)
     setError(null)
   }
 
@@ -885,13 +949,13 @@ export default function App() {
           </div>
           <div>
             <h1>QA/QC Intelligence</h1>
-            <p>Weekly report through {report.reportWeek.label}</p>
+            <p>{hasReport ? `Weekly report through ${report.reportWeek.label}` : 'Connect Smartsheet to generate a report'}</p>
           </div>
         </div>
         <div className="header-pills">
           <span className={cx('live-pill', connected && 'connected')}>
             <Database size={14} />
-            {connected ? 'Smartsheet Live' : 'Demo Data'}
+            {connected ? 'Smartsheet Live' : bundle.source === 'demo' ? 'Preview Layout' : 'Not Connected'}
           </span>
           <span>
             <CalendarClock size={14} />
@@ -907,6 +971,17 @@ export default function App() {
             <Bell size={16} />
             Updates
           </button>
+          {hasReport && (
+            <button
+              className="icon-button labeled"
+              type="button"
+              onClick={() => setSheetPanelOpen((prev) => !prev)}
+              aria-pressed={sheetPanelOpen}
+            >
+              {sheetPanelOpen ? <PanelLeftClose size={16} /> : <PanelLeftOpen size={16} />}
+              {sheetPanelOpen ? 'Hide Sheets' : 'Sheets'}
+            </button>
+          )}
           <button className="icon-button labeled" type="button" onClick={() => setConnectOpen(true)}>
             <KeyRound size={16} />
             {connected ? 'Auth' : 'Connect'}
@@ -918,7 +993,7 @@ export default function App() {
           <button
             className="button primary"
             type="button"
-            disabled={exporting}
+            disabled={exporting || !hasReport}
             onClick={async () => {
               setExporting(true)
               try {
@@ -934,7 +1009,7 @@ export default function App() {
           <button
             className="button primary pdf-button"
             type="button"
-            disabled={pdfExporting}
+            disabled={pdfExporting || !hasReport}
             onClick={async () => {
               setPdfExporting(true)
               try {
@@ -950,52 +1025,54 @@ export default function App() {
         </div>
       </header>
 
-      <section className="filter-strip">
-        <button
-          className={cx('oac-toggle', filters.oac && 'on')}
-          type="button"
-          onClick={() => setFilters((prev) => ({ ...prev, oac: !prev.oac }))}
-        >
-          <span>OAC</span>
-          <strong>{filters.oac ? `Through ${report.reportWeek.label}` : 'Manual'}</strong>
-        </button>
-        <FilterMenu
-          label="Work Week"
-          icon={<CalendarClock size={14} />}
-          options={report.filterOptions.workWeeks}
-          selected={filters.workWeeks}
-          disabled={filters.oac}
-          onChange={(workWeeks) => setFilters((prev) => ({ ...prev, workWeeks }))}
-        />
-        <FilterMenu
-          label="Discipline"
-          icon={<SlidersHorizontal size={14} />}
-          options={report.filterOptions.disciplines}
-          selected={filters.disciplines}
-          onChange={(disciplines) => setFilters((prev) => ({ ...prev, disciplines }))}
-        />
-        <FilterMenu
-          label="Contractor"
-          icon={<Filter size={14} />}
-          options={report.filterOptions.contractors}
-          selected={filters.contractors}
-          onChange={(contractors) => setFilters((prev) => ({ ...prev, contractors }))}
-        />
-        <FilterMenu
-          label="Subtype"
-          icon={<AlertCircle size={14} />}
-          options={report.filterOptions.subtypes}
-          selected={filters.subtypes}
-          onChange={(subtypes) => setFilters((prev) => ({ ...prev, subtypes }))}
-        />
-        <FilterMenu
-          label="Status"
-          icon={<CheckCircle2 size={14} />}
-          options={report.filterOptions.statuses}
-          selected={filters.statuses}
-          onChange={(statuses) => setFilters((prev) => ({ ...prev, statuses }))}
-        />
-      </section>
+      {hasReport && (
+        <section className="filter-strip">
+          <button
+            className={cx('oac-toggle', filters.oac && 'on')}
+            type="button"
+            onClick={() => setFilters((prev) => ({ ...prev, oac: !prev.oac }))}
+          >
+            <span>OAC</span>
+            <strong>{filters.oac ? `Through ${report.reportWeek.label}` : 'Manual'}</strong>
+          </button>
+          <FilterMenu
+            label="Work Week"
+            icon={<CalendarClock size={14} />}
+            options={report.filterOptions.workWeeks}
+            selected={filters.workWeeks}
+            disabled={filters.oac}
+            onChange={(workWeeks) => setFilters((prev) => ({ ...prev, workWeeks }))}
+          />
+          <FilterMenu
+            label="Discipline"
+            icon={<SlidersHorizontal size={14} />}
+            options={report.filterOptions.disciplines}
+            selected={filters.disciplines}
+            onChange={(disciplines) => setFilters((prev) => ({ ...prev, disciplines }))}
+          />
+          <FilterMenu
+            label="Contractor"
+            icon={<Filter size={14} />}
+            options={report.filterOptions.contractors}
+            selected={filters.contractors}
+            onChange={(contractors) => setFilters((prev) => ({ ...prev, contractors }))}
+          />
+          <FilterMenu
+            label="Subtype"
+            icon={<AlertCircle size={14} />}
+            options={report.filterOptions.subtypes}
+            selected={filters.subtypes}
+            onChange={(subtypes) => setFilters((prev) => ({ ...prev, subtypes }))}
+          />
+          <FilterMenu
+            label="Status"
+            icon={<CheckCircle2 size={14} />}
+            options={report.filterOptions.statuses}
+            selected={filters.statuses}
+            onChange={(statuses) => setFilters((prev) => ({ ...prev, statuses }))}
+          />
+        </section>
+      )}
 
       {error && (
         <div className="error-banner">
@@ -1005,31 +1082,47 @@ export default function App() {
         </div>
       )}
 
-      <main className="workspace">
-        <SheetPanel
-          sheets={sheets}
-          mapping={mapping}
-          search={sheetSearch}
-          setSearch={setSheetSearch}
-          onRoleChange={(role, sheetId) => void handleRoleChange(role, sheetId)}
-          connected={connected}
-        />
+      <main className={cx('workspace', hasReport && !showSheetPanel && 'workspace-expanded')}>
+        {showSheetPanel && (
+          <SheetPanel
+            sheets={sheets}
+            mapping={mapping}
+            search={sheetSearch}
+            setSearch={setSheetSearch}
+            onRoleChange={(role, sheetId) => void handleRoleChange(role, sheetId)}
+            connected={connected}
+          />
+        )}
         <section className="report-workspace">
-          <nav className="slide-tabs">
-            <button className={cx(activeSlide === 'overview' && 'active')} type="button" onClick={() => setActiveSlide('overview')}>
-              <Gauge size={15} />
-              Overview
-            </button>
-            <button className={cx(activeSlide === 'issues' && 'active')} type="button" onClick={() => setActiveSlide('issues')}>
-              <Table2 size={15} />
-              Issue Detail
-            </button>
-            <button className={cx(activeSlide === 'field' && 'active')} type="button" onClick={() => setActiveSlide('field')}>
-              <ClipboardCheck size={15} />
-              Inspections & Welding
-            </button>
-          </nav>
-          {slide}
+          {hasReport ? (
+            <>
+              <nav className="slide-tabs">
+                <button className={cx(activeSlide === 'overview' && 'active')} type="button" onClick={() => setActiveSlide('overview')}>
+                  <Gauge size={15} />
+                  Overview
+                </button>
+                <button className={cx(activeSlide === 'issues' && 'active')} type="button" onClick={() => setActiveSlide('issues')}>
+                  <Table2 size={15} />
+                  Issue Detail
+                </button>
+                <button className={cx(activeSlide === 'field' && 'active')} type="button" onClick={() => setActiveSlide('field')}>
+                  <ClipboardCheck size={15} />
+                  Inspections & Welding
+                </button>
+              </nav>
+              {slide}
+            </>
+          ) : (
+            <ConnectFirst
+              loading={loading}
+              onConnect={() => setConnectOpen(true)}
+              onPreview={() => {
+                setBundle(PREVIEW_BUNDLE)
+                setActiveSlide('overview')
+                setSheetPanelOpen(false)
+              }}
+            />
+          )}
         </section>
       </main>
 
@@ -1042,11 +1135,13 @@ export default function App() {
       />
       <UpdateModal open={updateOpen} onClose={() => setUpdateOpen(false)} info={updateInfo} />
 
-      <div className="export-deck" aria-hidden="true">
-        <OverviewSlide report={report} exportable />
-        <IssueTableSlide report={report} exportable />
-        <FieldSlide report={report} exportable />
-      </div>
+      {hasReport && (
+        <div className="export-deck" aria-hidden="true">
+          <OverviewSlide report={report} exportable />
+          <IssueTableSlide report={report} exportable />
+          <FieldSlide report={report} exportable />
+        </div>
+      )}
 
       {savedToken && (
         <button className="forget-token" type="button" onClick={clearAuth}>

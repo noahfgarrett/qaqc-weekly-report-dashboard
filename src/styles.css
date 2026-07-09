@@ -49,7 +49,7 @@ select:disabled {
 
 .app {
   min-height: 100vh;
-  padding: 22px;
+  padding: 18px;
 }
 
 .app-header {
@@ -288,9 +288,19 @@ select:disabled {
 
 .workspace {
   display: grid;
-  gap: 18px;
-  grid-template-columns: 330px minmax(0, 1fr);
+  gap: 16px;
+  grid-template-columns: 282px minmax(0, 1fr);
   align-items: start;
+}
+
+.workspace-expanded {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.workspace-expanded .report-workspace {
+  justify-self: center;
+  max-width: 1320px;
+  width: 100%;
 }
 
 .sheet-panel {
@@ -298,8 +308,8 @@ select:disabled {
   border: 1px solid rgba(226, 232, 240, 0.92);
   border-radius: 24px;
   box-shadow: var(--shadow);
-  min-height: 720px;
-  padding: 16px;
+  min-height: 680px;
+  padding: 14px;
   position: sticky;
   top: 126px;
 }
@@ -350,7 +360,7 @@ select:disabled {
   display: grid;
   gap: 8px;
   grid-template-columns: 18px 1fr;
-  padding: 10px;
+  padding: 9px;
 }
 
 .role-row select {
@@ -408,6 +418,75 @@ select:disabled {
   min-width: 0;
 }
 
+.connect-first {
+  align-items: center;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(244, 248, 251, 0.88)),
+    radial-gradient(circle at 65% 20%, rgba(56, 189, 248, 0.16), transparent 24rem);
+  border: 1px solid rgba(226, 232, 240, 0.92);
+  border-radius: 30px;
+  box-shadow: 0 28px 90px rgba(16, 23, 32, 0.14);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 640px;
+  padding: 54px;
+  text-align: center;
+}
+
+.connect-first-mark {
+  align-items: center;
+  background: var(--obsidian);
+  border-radius: 28px;
+  color: var(--cyan);
+  display: grid;
+  height: 82px;
+  place-items: center;
+  width: 82px;
+}
+
+.connect-first h2 {
+  font-size: clamp(32px, 4vw, 56px);
+  line-height: 1.02;
+  margin: 26px 0 0;
+  max-width: 760px;
+}
+
+.connect-first p {
+  color: var(--muted);
+  font-size: 16px;
+  font-weight: 750;
+  line-height: 1.55;
+  margin: 18px 0 0;
+  max-width: 680px;
+}
+
+.connect-first-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 28px;
+}
+
+.connect-first-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-top: 34px;
+  max-width: 920px;
+  width: 100%;
+}
+
+.connect-first-grid span {
+  background: #eef4f8;
+  border: 1px solid #dce5ee;
+  border-radius: 999px;
+  color: var(--graphite);
+  font-size: 12px;
+  font-weight: 900;
+  padding: 10px 12px;
+}
+
 .slide-tabs {
   align-items: center;
   display: flex;
@@ -431,7 +510,7 @@ select:disabled {
   background: var(--white);
   border-radius: 28px;
   box-shadow: 0 30px 90px rgba(16, 23, 32, 0.16);
-  max-width: 1180px;
+  max-width: 1320px;
   min-height: 0;
   overflow: hidden;
   position: relative;
@@ -517,9 +596,9 @@ select:disabled {
   border: 1px solid #e5edf3;
   border-radius: 18px;
   box-shadow: 0 14px 34px rgba(16, 23, 32, 0.08);
-  min-height: clamp(72px, 7vw, 92px);
+  min-height: clamp(68px, 6.4vw, 86px);
   overflow: hidden;
-  padding: 12px 13px;
+  padding: 10px 13px;
   position: relative;
 }
 
@@ -613,10 +692,10 @@ select:disabled {
 
 .overview-grid {
   display: grid;
-  gap: 1.4%;
-  grid-template-columns: 2fr 1fr;
+  gap: 1.9%;
+  grid-template-columns: 2.08fr 1fr;
   grid-template-rows: 1fr 1fr;
-  height: 48%;
+  height: 52%;
 }
 
 .panel {
@@ -626,7 +705,7 @@ select:disabled {
   box-shadow: 0 16px 42px rgba(16, 23, 32, 0.08);
   min-height: 0;
   overflow: hidden;
-  padding: 14px 16px;
+  padding: 15px 17px;
 }
 
 .panel.wide {
@@ -813,7 +892,7 @@ select:disabled {
 .detail-metrics,
 .field-chip-row {
   display: grid;
-  gap: 1.2%;
+  gap: 1.6%;
   grid-template-columns: repeat(4, 1fr);
   margin: 1.6% 0;
 }
@@ -929,9 +1008,9 @@ select:disabled {
 
 .field-chart-grid {
   display: grid;
-  gap: 1.4%;
+  gap: 1.9%;
   grid-template-columns: 1fr 1fr;
-  height: 69%;
+  height: 71%;
 }
 
 .modal-backdrop {
@@ -1122,7 +1201,7 @@ select:disabled {
   pointer-events: none;
   position: absolute;
   top: 0;
-  width: 1180px;
+  width: 1320px;
 }
 
 .export-deck .slide-frame {
@@ -1130,7 +1209,7 @@ select:disabled {
   box-shadow: none;
   margin-bottom: 24px;
   max-width: none;
-  width: 1180px;
+  width: 1320px;
 }
 
 .spin {
