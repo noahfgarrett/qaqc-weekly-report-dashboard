@@ -381,111 +381,252 @@ function FilterMenu({
   )
 }
 
+type PlotPoint = {
+  x: number
+  y: number
+}
+
+function niceMax(value: number, steps = 4): number {
+  if (value <= steps) return steps
+  const magnitude = 10 ** Math.floor(Math.log10(value))
+  const normalized = value / magnitude
+  const step = normalized <= 2 ? magnitude / 2 : normalized <= 5 ? magnitude : magnitude * 2
+  return Math.ceil(value / step) * step
+}
+
+function chartTicks(max: number, steps = 4): number[] {
+  return Array.from({ length: steps + 1 }, (_, index) => max - (max / steps) * index)
+}
+
+function smoothPath(points: PlotPoint[]): string {
+  if (points.length === 0) return ''
+  return points.reduce<string>((path, point, index) => {
+    if (index === 0) return `M ${point.x} ${point.y}`
+    const previous = points[index - 1]
+    const control = (point.x - previous.x) / 3
+    return `${path} C ${previous.x + control} ${previous.y}, ${point.x - control} ${point.y}, ${point.x} ${point.y}`
+  }, '')
+}
+
+function areaPath(points: PlotPoint[], baseline: number): string {
+  if (points.length === 0) return ''
+  return `${smoothPath(points)} L ${points[points.length - 1].x} ${baseline} L ${points[0].x} ${baseline} Z`
+}
+
+function chartValue(value: number): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1)
+}
+
+function ChartTooltip({
+  title,
+  entries,
+  xPercent = 12,
+  compact,
+}: {
+  title: string
+  entries: string[]
+  xPercent?: number
+  compact?: boolean
+}) {
+  return (
+    <div
+      className={cx('chart-tooltip', compact && 'compact')}
+      style={{ left: `${Math.max(11, Math.min(89, xPercent))}%` }}
+    >
+      <strong>{title}</strong>
+      {entries.map((entry) => <span key={entry}>{entry}</span>)}
+    </div>
+  )
+}
+
 function RangeChart({ data }: { data: WeeklyIssuePoint[] }) {
-  const [hovered, setHovered] = useState<WeeklyIssuePoint | null>(null)
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
   const visible = data.slice(-30)
-  const maxBar = Math.max(1, ...visible.flatMap((point) => [point.opened, point.closed]))
-  const maxLine = Math.max(1, ...visible.map((point) => point.remainingOpen))
-  const width = 960
-  const height = 340
-  const pad = { l: 46, r: 28, t: 22, b: 94 }
+  const max = niceMax(Math.max(1, ...visible.flatMap((point) => [point.opened, point.closed, point.remainingOpen])))
+  const width = 980
+  const height = 370
+  const pad = { l: 62, r: 28, t: 24, b: 102 }
   const chartW = width - pad.l - pad.r
   const chartH = height - pad.t - pad.b
-  const group = chartW / visible.length
+  const group = chartW / Math.max(visible.length, 1)
+  const toY = (value: number) => pad.t + chartH - (value / max) * chartH
   const points = visible.map((point, index) => ({
     x: pad.l + index * group + group / 2,
-    y: pad.t + chartH - (point.remainingOpen / maxLine) * chartH,
+    y: toY(point.remainingOpen),
     point,
   }))
-  const path = points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`).join(' ')
+  const hovered = hoveredIndex === null ? null : visible[hoveredIndex]
+  const hoveredPoint = hoveredIndex === null ? null : points[hoveredIndex]
 
   return (
     <div className="chart-shell">
-      <div className="chart-legend">
-        <span className="legend-opened">Opened</span>
-        <span className="legend-closed">Closed</span>
-        <span className="legend-remaining">Remaining Open</span>
+      <div className="chart-topline">
+        <div className="chart-legend">
+          <span className="legend-opened">Opened</span>
+          <span className="legend-closed">Closed</span>
+          <span className="legend-remaining">Remaining Open</span>
+        </div>
+        <span className="chart-window">Last {visible.length} reporting weeks</span>
       </div>
       <svg viewBox={`0 0 ${width} ${height}`} className="chart-svg" role="img" aria-label="Issues by Work Week">
-        {[0, 0.25, 0.5, 0.75, 1].map((tick) => (
-          <line
-            key={tick}
+        <defs>
+          <linearGradient id="remaining-area" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.2" />
+            <stop offset="100%" stopColor="#f59e0b" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        {chartTicks(max).map((tick) => (
+          <g key={tick}>
+            <line
             x1={pad.l}
             x2={width - pad.r}
-            y1={pad.t + chartH * tick}
-            y2={pad.t + chartH * tick}
+            y1={toY(tick)}
+            y2={toY(tick)}
             className="grid-line"
-          />
+            />
+            <text className="tick-label" x={pad.l - 10} y={toY(tick) + 4} textAnchor="end">{chartValue(tick)}</text>
+          </g>
         ))}
         {visible.map((point, index) => {
           const baseX = pad.l + index * group + group * 0.2
-          const openedH = (point.opened / maxBar) * chartH * 0.82
-          const closedH = (point.closed / maxBar) * chartH * 0.82
+          const openedH = (point.opened / max) * chartH
+          const closedH = (point.closed / max) * chartH
+          const isActive = index === hoveredIndex
+          const isLatest = index === visible.length - 1
           return (
-            <g key={point.workWeek} onMouseEnter={() => setHovered(point)} onMouseLeave={() => setHovered(null)}>
-              <rect className="bar opened" x={baseX} y={pad.t + chartH - openedH} width={group * 0.22} height={openedH} rx="5" />
-              <rect className="bar closed" x={baseX + group * 0.28} y={pad.t + chartH - closedH} width={group * 0.22} height={closedH} rx="5" />
+            <g key={point.workWeek} onMouseEnter={() => setHoveredIndex(index)} onMouseLeave={() => setHoveredIndex(null)}>
+              {isLatest && <rect className="report-week-band" x={pad.l + index * group} y={pad.t} width={group} height={chartH} rx="8" />}
+              <rect className="chart-hit-area" x={pad.l + index * group} y={pad.t} width={group} height={chartH} />
+              <rect className="bar opened" x={baseX} y={pad.t + chartH - openedH} width={group * 0.23} height={openedH} rx="5" />
+              <rect className="bar closed" x={baseX + group * 0.31} y={pad.t + chartH - closedH} width={group * 0.23} height={closedH} rx="5" />
+              {(isActive || isLatest) && point.opened > 0 && <text className="bar-value" x={baseX + group * 0.115} y={toY(point.opened) - 7} textAnchor="middle">{point.opened}</text>}
+              {(isActive || isLatest) && point.closed > 0 && <text className="bar-value" x={baseX + group * 0.425} y={toY(point.closed) - 7} textAnchor="middle">{point.closed}</text>}
               {(index % 3 === 0 || index === visible.length - 1) && (
-              <text x={pad.l + index * group + group / 2} y={height - 48} textAnchor="end" transform={`rotate(-45 ${pad.l + index * group + group / 2} ${height - 48})`}>
+              <text x={pad.l + index * group + group / 2} y={height - 54} textAnchor="end" transform={`rotate(-45 ${pad.l + index * group + group / 2} ${height - 54})`}>
                   {point.workWeek.replace('WW', '')}
                 </text>
               )}
             </g>
           )
         })}
-        <path d={path} className="remaining-line" fill="none" />
+        <path d={areaPath(points, pad.t + chartH)} className="remaining-area" />
+        <path d={smoothPath(points)} className="remaining-line" fill="none" />
         {points.map(({ x, y, point }) => (
-          <circle key={point.workWeek} cx={x} cy={y} r="3.5" className="remaining-dot" onMouseEnter={() => setHovered(point)} onMouseLeave={() => setHovered(null)} />
+          <circle key={point.workWeek} cx={x} cy={y} r={point === hovered ? 5 : 3.5} className="remaining-dot" />
         ))}
+        {points.length > 0 && (
+          <text className="series-end-label" x={points[points.length - 1].x - 8} y={Math.max(pad.t + 12, points[points.length - 1].y - 10)} textAnchor="end">
+            {`Open ${points[points.length - 1].point.remainingOpen}`}
+          </text>
+        )}
+        <text x={width / 2} y={height - 18} className="axis-title" textAnchor="middle">Work Week</text>
+        <text x="17" y={pad.t + chartH / 2} transform={`rotate(-90 17 ${pad.t + chartH / 2})`} className="axis-title" textAnchor="middle">Issue Count</text>
       </svg>
-      {hovered && (
-        <div className="chart-tooltip">
-          <strong>{hovered.workWeek}</strong>
-          <span>Opened {hovered.opened}</span>
-          <span>Closed {hovered.closed}</span>
-          <span>Remaining {hovered.remainingOpen}</span>
-        </div>
+      {hovered && hoveredPoint && (
+        <ChartTooltip
+          title={hovered.workWeek}
+          entries={[`Opened ${hovered.opened}`, `Closed ${hovered.closed}`, `Remaining ${hovered.remainingOpen}`]}
+          xPercent={(hoveredPoint.x / width) * 100}
+        />
       )}
     </div>
   )
 }
 
 function MonthlyChart({ data }: { data: MonthlyIssuePoint[] }) {
-  const visible = data.slice(-9)
-  const max = Math.max(1, ...visible.flatMap((point) => [point.opened, point.closed]))
-  const width = 420
-  const height = 190
-  const pad = { l: 34, r: 18, t: 18, b: 34 }
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
+  const visible = data.slice(-8)
+  const max = niceMax(Math.max(1, ...visible.flatMap((point) => [point.opened, point.closed])))
+  const width = 460
+  const height = 230
+  const pad = { l: 48, r: 22, t: 18, b: 42 }
   const chartW = width - pad.l - pad.r
   const chartH = height - pad.t - pad.b
   const step = chartW / Math.max(1, visible.length - 1)
-  const pathFor = (key: 'opened' | 'closed') =>
-    visible.map((point, index) => `${index === 0 ? 'M' : 'L'} ${pad.l + index * step} ${pad.t + chartH - (point[key] / max) * chartH}`).join(' ')
+  const toY = (value: number) => pad.t + chartH - (value / max) * chartH
+  const pointsFor = (key: 'opened' | 'closed') => visible.map((point, index) => ({
+    x: pad.l + index * step,
+    y: toY(point[key]),
+  }))
+  const openedPoints = pointsFor('opened')
+  const closedPoints = pointsFor('closed')
+  const hovered = hoveredIndex === null ? null : visible[hoveredIndex]
   return (
-    <svg className="mini-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Cumulative Opened vs Closed">
-      <line x1={pad.l} x2={width - pad.r} y1={pad.t + chartH} y2={pad.t + chartH} className="grid-line" />
-      <path d={pathFor('opened')} className="opened-line" fill="none" />
-      <path d={pathFor('closed')} className="closed-line" fill="none" />
-      {visible.map((point, index) => (
-        <text key={point.month} x={pad.l + index * step} y={height - 10} textAnchor="middle">
-          {index % 2 === 0 ? point.month : ''}
-        </text>
-      ))}
-    </svg>
+    <div className="chart-shell mini-chart-shell">
+      <div className="chart-legend compact-legend">
+        <span className="legend-opened">Opened</span>
+        <span className="legend-closed">Closed</span>
+        <span className="legend-gap">Open Gap</span>
+      </div>
+      <svg className="mini-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Cumulative Opened vs Closed">
+        <defs>
+          <linearGradient id="monthly-gap" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.18" />
+            <stop offset="100%" stopColor="#14b8a6" stopOpacity="0.04" />
+          </linearGradient>
+        </defs>
+        {chartTicks(max).map((tick) => (
+          <g key={tick}>
+            <line x1={pad.l} x2={width - pad.r} y1={toY(tick)} y2={toY(tick)} className="grid-line" />
+            <text className="tick-label" x={pad.l - 8} y={toY(tick) + 4} textAnchor="end">{chartValue(tick)}</text>
+          </g>
+        ))}
+        {visible.map((point, index) => (
+          <g key={point.month} onMouseEnter={() => setHoveredIndex(index)} onMouseLeave={() => setHoveredIndex(null)}>
+            <rect className="chart-hit-area" x={pad.l + index * step - step / 2} y={pad.t} width={step} height={chartH} />
+            {(index % 2 === 0 || index === visible.length - 1) && (
+              <text x={pad.l + index * step} y={height - 12} textAnchor="middle">{point.month}</text>
+            )}
+          </g>
+        ))}
+        <path d={`${smoothPath(openedPoints)} ${[...closedPoints].reverse().map((point) => `L ${point.x} ${point.y}`).join(' ')} Z`} className="monthly-gap-area" />
+        <path d={smoothPath(openedPoints)} className="opened-line" fill="none" />
+        <path d={smoothPath(closedPoints)} className="closed-line" fill="none" />
+        {openedPoints.map((point, index) => <circle key={`opened-${visible[index].month}`} cx={point.x} cy={point.y} r={index === hoveredIndex ? 4 : 2.5} className="opened-dot" />)}
+        {closedPoints.map((point, index) => <circle key={`closed-${visible[index].month}`} cx={point.x} cy={point.y} r={index === hoveredIndex ? 4 : 2.5} className="closed-dot" />)}
+        {visible.length > 0 && (
+          <>
+            <text className="series-end-label opened-label" x={openedPoints[openedPoints.length - 1].x - 5} y={openedPoints[openedPoints.length - 1].y - 8} textAnchor="end">{visible[visible.length - 1].opened}</text>
+            <text className="series-end-label closed-label" x={closedPoints[closedPoints.length - 1].x - 5} y={closedPoints[closedPoints.length - 1].y + 14} textAnchor="end">{visible[visible.length - 1].closed}</text>
+          </>
+        )}
+      </svg>
+      {hovered && (
+        <ChartTooltip
+          compact
+          title={hovered.month}
+          entries={[`Opened ${hovered.opened}`, `Closed ${hovered.closed}`, `Gap ${hovered.gap}`]}
+          xPercent={visible.length > 1 ? ((hoveredIndex ?? 0) / (visible.length - 1)) * 100 : 50}
+        />
+      )}
+    </div>
   )
 }
 
 function AgingChart({ data }: { data: AgingBucket[] }) {
-  const max = Math.max(1, ...data.map((bucket) => bucket.count))
+  const total = data.reduce((sum, bucket) => sum + bucket.count, 0)
   return (
     <div className="aging-chart">
+      <div className="aging-summary">
+        <strong>{compactNumber(total)}</strong>
+        <span>Issues measured by age</span>
+      </div>
+      <div className="aging-stack" aria-label="Issue aging distribution">
+        {data.map((bucket) => (
+          <i
+            key={bucket.label}
+            style={{ width: `${total ? (bucket.count / total) * 100 : 0}%`, background: bucket.color }}
+            title={`${bucket.label}: ${bucket.count}`}
+          />
+        ))}
+      </div>
       {data.map((bucket) => (
         <div className="aging-row" key={bucket.label}>
-          <span>{bucket.label}</span>
+          <span><i style={{ background: bucket.color }} />{bucket.label}</span>
           <div>
-            <i style={{ width: `${(bucket.count / max) * 100}%`, background: bucket.color }} />
+            <i style={{ width: `${total ? (bucket.count / total) * 100 : 0}%`, background: bucket.color }} />
           </div>
-          <strong>{bucket.count}</strong>
+          <strong>{bucket.count}<em>{total ? Math.round((bucket.count / total) * 100) : 0}%</em></strong>
         </div>
       ))}
     </div>
@@ -493,76 +634,143 @@ function AgingChart({ data }: { data: AgingBucket[] }) {
 }
 
 function ElectricalChart({ data }: { data: ElectricalPoint[] }) {
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
   const visible = data.slice(-24)
-  const max = Math.max(1, ...visible.map((point) => point.finals))
-  const width = 560
-  const height = 360
-  const pad = { l: 42, r: 24, t: 22, b: 126 }
+  const max = niceMax(Math.max(1, ...visible.map((point) => point.finals)))
+  const width = 620
+  const height = 390
+  const pad = { l: 54, r: 28, t: 24, b: 110 }
   const chartW = width - pad.l - pad.r
   const chartH = height - pad.t - pad.b
   const step = chartW / Math.max(1, visible.length - 1)
-  const path = visible.map((point, index) => `${index === 0 ? 'M' : 'L'} ${pad.l + index * step} ${pad.t + chartH - (point.finals / max) * chartH}`).join(' ')
+  const toY = (value: number) => pad.t + chartH - (value / max) * chartH
+  const points = visible.map((point, index) => ({ x: pad.l + index * step, y: toY(point.finals) }))
+  const hovered = hoveredIndex === null ? null : visible[hoveredIndex]
   return (
-    <svg className="chart-svg" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Electrical Inspections by Work Week">
-      <line x1={pad.l} x2={width - pad.r} y1={pad.t + chartH} y2={pad.t + chartH} className="grid-line" />
-      <text x="18" y="180" transform="rotate(-90 18 180)" className="axis-title">Inspection Count</text>
-      <text x="226" y={height - 18} className="axis-title">Work Week Observed</text>
-      <path d={path} className="electrical-line" fill="none" />
-      {visible.map((point, index) => {
-        const x = pad.l + index * step
-        const y = pad.t + chartH - (point.finals / max) * chartH
-        return (
-          <g key={point.workWeek}>
-            <circle cx={x} cy={y} r="3.5" className="electrical-dot" />
-            {point.issuesFound > 0 && <circle cx={x} cy={y - 12} r="5" className="issue-marker" />}
-            {(index % 5 === 0 || index === visible.length - 1) && (
-              <text x={x} y={height - 86} textAnchor="end" transform={`rotate(-45 ${x} ${height - 86})`}>
-                {point.workWeek.replace('WW', '')}
-              </text>
-            )}
+    <div className="chart-shell field-chart-shell">
+      <svg className="chart-svg" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Electrical Inspections by Work Week">
+        <defs>
+          <linearGradient id="electrical-area" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stopColor="#14b8a6" stopOpacity="0.26" />
+            <stop offset="100%" stopColor="#14b8a6" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        {chartTicks(max).map((tick) => (
+          <g key={tick}>
+            <line x1={pad.l} x2={width - pad.r} y1={toY(tick)} y2={toY(tick)} className="grid-line" />
+            <text className="tick-label" x={pad.l - 9} y={toY(tick) + 4} textAnchor="end">{chartValue(tick)}</text>
           </g>
-        )
-      })}
-    </svg>
+        ))}
+        <path d={areaPath(points, pad.t + chartH)} className="electrical-area" />
+        <path d={smoothPath(points)} className="electrical-line" fill="none" />
+        {visible.map((point, index) => {
+          const { x, y } = points[index]
+          const isLatest = index === visible.length - 1
+          const isActive = index === hoveredIndex
+          return (
+            <g key={point.workWeek} onMouseEnter={() => setHoveredIndex(index)} onMouseLeave={() => setHoveredIndex(null)}>
+              <rect className="chart-hit-area" x={x - step / 2} y={pad.t} width={step} height={chartH} />
+              <circle cx={x} cy={y} r={isActive ? 5 : 3.5} className="electrical-dot" />
+              {point.issuesFound > 0 && (
+                <g className="issue-badge" transform={`translate(${x} ${Math.max(pad.t + 12, y - 18)})`}>
+                  <circle r="8" />
+                  <text textAnchor="middle" y="3">{point.issuesFound}</text>
+                </g>
+              )}
+              {isLatest && <text className="series-end-label electrical-label" x={x - 7} y={Math.max(pad.t + 12, y - 10)} textAnchor="end">{point.finals}</text>}
+              {(index % 4 === 0 || isLatest) && (
+                <text x={x} y={height - 62} textAnchor="end" transform={`rotate(-45 ${x} ${height - 62})`}>
+                  {point.workWeek.replace('WW', '')}
+                </text>
+              )}
+            </g>
+          )
+        })}
+        <text x="17" y={pad.t + chartH / 2} transform={`rotate(-90 17 ${pad.t + chartH / 2})`} className="axis-title" textAnchor="middle">Final Inspections</text>
+        <text x={width / 2} y={height - 18} className="axis-title" textAnchor="middle">Work Week Observed</text>
+      </svg>
+      {hovered && (
+        <ChartTooltip
+          title={hovered.workWeek}
+          entries={[`Final inspections ${hovered.finals}`, `Issues found ${hovered.issuesFound}`]}
+          xPercent={visible.length > 1 ? ((hoveredIndex ?? 0) / (visible.length - 1)) * 100 : 50}
+        />
+      )}
+    </div>
   )
 }
 
 function WeldingChart({ data }: { data: WeldingPoint[] }) {
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
   const visible = data.slice(-24)
-  const max = Math.max(1, ...visible.flatMap((point) => [point.signed, point.total]))
-  const width = 560
-  const height = 360
-  const pad = { l: 42, r: 42, t: 22, b: 126 }
+  const max = niceMax(Math.max(1, ...visible.flatMap((point) => [point.signed, point.total])))
+  const width = 620
+  const height = 390
+  const pad = { l: 54, r: 54, t: 24, b: 110 }
   const chartW = width - pad.l - pad.r
   const chartH = height - pad.t - pad.b
-  const group = chartW / visible.length
-  const line = visible.map((point, index) => `${index === 0 ? 'M' : 'L'} ${pad.l + index * group + group / 2} ${pad.t + chartH - (point.signoffRate / 100) * chartH}`).join(' ')
+  const group = chartW / Math.max(visible.length, 1)
+  const toY = (value: number) => pad.t + chartH - (value / max) * chartH
+  const toPercentY = (value: number) => pad.t + chartH - (value / 100) * chartH
+  const linePoints = visible.map((point, index) => ({
+    x: pad.l + index * group + group / 2,
+    y: toPercentY(point.signoffRate),
+  }))
+  const hovered = hoveredIndex === null ? null : visible[hoveredIndex]
   return (
-    <svg className="chart-svg" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Welding Signoffs by Work Week">
-      <line x1={pad.l} x2={width - pad.r} y1={pad.t + chartH} y2={pad.t + chartH} className="grid-line" />
-      <line x1={pad.l} x2={width - pad.r} y1={pad.t + chartH - chartH * 0.1} y2={pad.t + chartH - chartH * 0.1} className="baseline" />
-      <text x={width - pad.r - 58} y={pad.t + chartH - chartH * 0.1 - 6} className="axis-title">10% Baseline</text>
-      <text x="18" y="180" transform="rotate(-90 18 180)" className="axis-title">Weld Count</text>
-      <text x={width - 16} y="180" transform={`rotate(90 ${width - 16} 180)`} className="axis-title">Sign-off %</text>
-      {visible.map((point, index) => {
-        const x = pad.l + index * group + group * 0.16
-        const signedH = (point.signed / max) * chartH * 0.82
-        const totalH = (point.total / max) * chartH * 0.82
-        return (
-          <g key={point.workWeek}>
-            <rect className="bar closed" x={x} y={pad.t + chartH - signedH} width={group * 0.25} height={signedH} rx="5" />
-            <rect className="bar opened" x={x + group * 0.3} y={pad.t + chartH - totalH} width={group * 0.25} height={totalH} rx="5" />
-            {point.issuesCreated > 0 && <circle cx={x + group * 0.28} cy={pad.t + chartH - totalH - 10} r="5" className="issue-marker" />}
-            {(index % 5 === 0 || index === visible.length - 1) && (
-              <text x={pad.l + index * group + group / 2} y={height - 86} textAnchor="end" transform={`rotate(-45 ${pad.l + index * group + group / 2} ${height - 86})`}>
-                {point.workWeek.replace('WW', '')}
-              </text>
-            )}
+    <div className="chart-shell field-chart-shell">
+      <svg className="chart-svg" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Welding Signoffs by Work Week">
+        {chartTicks(max).map((tick) => (
+          <g key={tick}>
+            <line x1={pad.l} x2={width - pad.r} y1={toY(tick)} y2={toY(tick)} className="grid-line" />
+            <text className="tick-label" x={pad.l - 9} y={toY(tick) + 4} textAnchor="end">{chartValue(tick)}</text>
           </g>
-        )
-      })}
-      <path d={line} className="signoff-line" fill="none" />
-    </svg>
+        ))}
+        {[0, 25, 50, 75, 100].map((tick) => <text key={tick} className="percent-tick" x={width - pad.r + 9} y={toPercentY(tick) + 4}>{tick}%</text>)}
+        <line x1={pad.l} x2={width - pad.r} y1={toPercentY(10)} y2={toPercentY(10)} className="baseline" />
+        <text x={width - pad.r - 4} y={toPercentY(10) - 7} className="baseline-label" textAnchor="end">10% target</text>
+        {visible.map((point, index) => {
+          const x = pad.l + index * group + group * 0.14
+          const signedH = (point.signed / max) * chartH
+          const totalH = (point.total / max) * chartH
+          const isLatest = index === visible.length - 1
+          const isActive = index === hoveredIndex
+          return (
+            <g key={point.workWeek} onMouseEnter={() => setHoveredIndex(index)} onMouseLeave={() => setHoveredIndex(null)}>
+              <rect className="chart-hit-area" x={pad.l + index * group} y={pad.t} width={group} height={chartH} />
+              <rect className="bar closed" x={x} y={pad.t + chartH - signedH} width={group * 0.29} height={signedH} rx="5" />
+              <rect className="bar opened" x={x + group * 0.35} y={pad.t + chartH - totalH} width={group * 0.29} height={totalH} rx="5" />
+              {(isActive || isLatest) && point.signed > 0 && <text className="bar-value" x={x + group * 0.145} y={toY(point.signed) - 7} textAnchor="middle">{point.signed}</text>}
+              {(isActive || isLatest) && point.total > 0 && <text className="bar-value" x={x + group * 0.495} y={toY(point.total) - 7} textAnchor="middle">{point.total}</text>}
+              {point.issuesCreated > 0 && (
+                <g className="issue-badge" transform={`translate(${x + group * 0.49} ${Math.max(pad.t + 12, toY(point.total) - 16)})`}>
+                  <circle r="8" />
+                  <text textAnchor="middle" y="3">{point.issuesCreated}</text>
+                </g>
+              )}
+              {(index % 4 === 0 || isLatest) && (
+                <text x={pad.l + index * group + group / 2} y={height - 62} textAnchor="end" transform={`rotate(-45 ${pad.l + index * group + group / 2} ${height - 62})`}>
+                  {point.workWeek.replace('WW', '')}
+                </text>
+              )}
+            </g>
+          )
+        })}
+        <path d={smoothPath(linePoints)} className="signoff-line" fill="none" />
+        {linePoints.map((point, index) => <circle key={`signoff-${visible[index].workWeek}`} cx={point.x} cy={point.y} r={index === hoveredIndex ? 4.5 : 2.7} className="signoff-dot" />)}
+        {visible.length > 0 && <text className="series-end-label signoff-label" x={linePoints[linePoints.length - 1].x - 7} y={Math.max(pad.t + 13, linePoints[linePoints.length - 1].y - 10)} textAnchor="end">{percent(visible[visible.length - 1].signoffRate, 0)}</text>}
+        <text x="17" y={pad.t + chartH / 2} transform={`rotate(-90 17 ${pad.t + chartH / 2})`} className="axis-title" textAnchor="middle">Weld Count</text>
+        <text x={width - 17} y={pad.t + chartH / 2} transform={`rotate(90 ${width - 17} ${pad.t + chartH / 2})`} className="axis-title" textAnchor="middle">Sign-off %</text>
+        <text x={width / 2} y={height - 18} className="axis-title" textAnchor="middle">Weld Work Week</text>
+      </svg>
+      {hovered && (
+        <ChartTooltip
+          title={hovered.workWeek}
+          entries={[`Signed ${hovered.signed} of ${hovered.total}`, `Sign-off ${percent(hovered.signoffRate, 1)}`, `Issues created ${hovered.issuesCreated}`]}
+          xPercent={visible.length > 1 ? ((hoveredIndex ?? 0) / (visible.length - 1)) * 100 : 50}
+        />
+      )}
+    </div>
   )
 }
 

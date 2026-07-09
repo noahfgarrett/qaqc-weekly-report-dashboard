@@ -7,6 +7,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.0.3',
+    date: '2026-07-09T20:04:56Z',
+    type: 'feature',
+    notes: [
+      'Charts now use smoother series, clearer scales, direct data labels, issue badges, and interactive hover details',
+      'Slide cards, chart panels, and the BIM issue table now have consistent gutters and stay clear of the GC template rails',
+      'The application header now keeps a consistent gap above the Smartsheet workspace and report filters',
+    ],
+  },
+  {
     version: '1.0.2',
     date: '2026-07-09T19:00:00Z',
     type: 'fix',
