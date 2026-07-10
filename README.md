@@ -1,11 +1,11 @@
 # QA/QC Weekly Report Dashboard
 
-Premium HTML dashboard for Smartsheet-backed weekly QA/QC reporting.
+Standalone HTML dashboard for weekly QA/QC reporting from Smartsheet exports.
 
 ## What It Does
 
-- Connects to Smartsheet with a saved local token.
-- Auto-maps the default sheets:
+- Imports `.xls`, `.xlsx`, and `.csv` files exported from Smartsheet.
+- Auto-maps the four required logs by filename and column headers:
   - BIM Issues Log
   - Mechanical / Process Inspection Log
   - Electrical Inspection Log
@@ -14,6 +14,13 @@ Premium HTML dashboard for Smartsheet-backed weekly QA/QC reporting.
 - Provides slicers for Work Week, Discipline, Contractor, Subtype, and Status.
 - Exports a GC-safe three-slide report deck as PPTX or PDF.
 - Checks release metadata for packaged HTML app updates and downloads the new HTML file directly.
+
+## Weekly Workflow
+
+1. Schedule the four Smartsheet logs to be emailed as Excel attachments each Tuesday.
+2. Download the attachments from the company email account.
+3. Open `QAQC-Weekly-Report-Dashboard.html` and drop all four files into the import screen.
+4. Review the report and export the GC-safe PPTX or PDF.
 
 ## Local Development
 
@@ -45,4 +52,4 @@ The in-app updater expects the latest release to include an `.html` asset. The m
 
 ## Security
 
-Smartsheet tokens are stored only in the browser's local storage on the user's device. Tokens are not committed, bundled, or uploaded by this app.
+The dashboard does not request or store a Smartsheet API token. Imported spreadsheet data stays in memory for the current browser session and is not persisted or uploaded. Legacy token data from earlier versions is removed automatically. The optional update checker only requests public GitHub release metadata.

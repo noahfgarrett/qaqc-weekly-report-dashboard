@@ -7,6 +7,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.0.4',
+    date: '2026-07-10T13:46:30Z',
+    type: 'feature',
+    notes: [
+      'Weekly Smartsheet exports can now be dropped directly into the standalone HTML app as XLS, XLSX, or CSV files',
+      'The app automatically identifies all four required logs by filename and column headers without an API token or corporate proxy',
+      'Imported spreadsheet data stays in the current browser session, and legacy saved Smartsheet credentials are removed automatically',
+      'Report slides now retain their full 16:9 width at 1280px laptop viewports instead of collapsing into the file-panel column',
+    ],
+  },
+  {
     version: '1.0.3',
     date: '2026-07-09T20:04:56Z',
     type: 'feature',

@@ -2,14 +2,6 @@ import type { LucideIcon } from 'lucide-react'
 
 export type SheetRole = 'bimIssues' | 'mechanical' | 'electrical' | 'welding'
 
-export interface SmartSheetSummary {
-  id: number
-  name: string
-  accessLevel?: string
-  permalink?: string
-  modifiedAt?: string
-}
-
 export interface SheetRecord {
   id: number | string
   name: string
@@ -17,8 +9,16 @@ export interface SheetRecord {
 }
 
 export interface SheetBundle {
-  source: 'empty' | 'demo' | 'smartsheet'
+  source: 'empty' | 'demo' | 'files'
   sheets: Record<SheetRole, SheetRecord>
+}
+
+export interface ImportedSheetFile {
+  role: SheetRole
+  fileName: string
+  worksheetName: string
+  rowCount: number
+  sheet: SheetRecord
 }
 
 export interface RoleConfig {
@@ -116,7 +116,7 @@ export interface ReportModel {
   reportWeek: WorkWeek
   previousReportWeek: WorkWeek
   cutoffDate: Date
-  source: 'empty' | 'demo' | 'smartsheet'
+  source: 'empty' | 'demo' | 'files'
   sheetHealth: Record<SheetRole, boolean>
   filterOptions: FilterOptions
   activeFilters: ReportFilters

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Activity,
   AlertCircle,
@@ -8,24 +8,21 @@ import {
   CheckCircle2,
   ChevronDown,
   ClipboardCheck,
-  Database,
   Download,
+  FileUp,
   FileSpreadsheet,
   Filter,
   Gauge,
   GitBranch,
-  KeyRound,
   LineChart,
-  Link2,
-  LockKeyhole,
   PanelLeftClose,
   PanelLeftOpen,
   RefreshCw,
-  Search,
   ShieldCheck,
   SlidersHorizontal,
   Table2,
-  Unlink,
+  Trash2,
+  Upload,
   Wrench,
   X,
 } from 'lucide-react'
@@ -34,26 +31,13 @@ import { buildSampleBundle } from '@/data/sampleData'
 import { CHANGELOG } from '@/data/changelog'
 import { exportReportDeck } from '@/export/pptx'
 import { exportSlidesPdf } from '@/export/pdf'
-import {
-  autoMapSheets,
-  DEFAULT_ROLE_NAMES,
-  listSmartsheets,
-  loadMappedSheets,
-} from '@/services/smartsheet'
-import {
-  clearSmartsheetToken,
-  loadFilters,
-  loadSheetMapping,
-  loadSmartsheetToken,
-  loadTokenMeta,
-  saveFilters,
-  saveSheetMapping,
-  saveSmartsheetToken,
-} from '@/services/storage'
+import { importSpreadsheet } from '@/services/fileImport'
+import { clearLegacyConnectionData, loadFilters, saveFilters } from '@/services/storage'
 import { checkForUpdate, downloadUpdate } from '@/services/updateChecker'
 import type {
   AgingBucket,
   ElectricalPoint,
+  ImportedSheetFile,
   IssueDetailRow,
   KpiMetric,
   MonthlyIssuePoint,
@@ -61,7 +45,6 @@ import type {
   SheetBundle,
   SheetRecord,
   SheetRole,
-  SmartSheetSummary,
   UpdateInfo,
   WeeklyIssuePoint,
   WeldingPoint,
@@ -132,70 +115,6 @@ function Modal({
         {children}
       </div>
     </div>
-  )
-}
-
-function ConnectModal({
-  open,
-  onClose,
-  onConnect,
-  savedLabel,
-  loading,
-}: {
-  open: boolean
-  onClose: () => void
-  onConnect: (token: string, remember: boolean) => void
-  savedLabel?: string
-  loading: boolean
-}) {
-  const [token, setToken] = useState('')
-  const [remember, setRemember] = useState(true)
-
-  useEffect(() => {
-    if (open) setToken('')
-  }, [open])
-
-  return (
-    <Modal open={open} title="Smartsheet Connection" onClose={onClose}>
-      <div className="connect-panel">
-        <div className="secure-mark">
-          <LockKeyhole size={18} />
-          <span>{savedLabel ? `Saved auth: ${savedLabel}` : 'Personal access token'}</span>
-        </div>
-        <label className="field">
-          <span>API token</span>
-          <input
-            value={token}
-            onChange={(event) => setToken(event.target.value)}
-            type="password"
-            placeholder="Paste Smartsheet API token"
-            autoFocus
-          />
-        </label>
-        <label className="check-row">
-          <input
-            type="checkbox"
-            checked={remember}
-            onChange={(event) => setRemember(event.target.checked)}
-          />
-          <span>Remember this device</span>
-        </label>
-        <div className="modal-actions">
-          <button className="button secondary" type="button" onClick={onClose}>
-            Cancel
-          </button>
-          <button
-            className="button primary"
-            type="button"
-            onClick={() => onConnect(token.trim(), remember)}
-            disabled={!token.trim() || loading}
-          >
-            {loading ? <RefreshCw size={16} className="spin" /> : <Link2 size={16} />}
-            Connect
-          </button>
-        </div>
-      </div>
-    </Modal>
   )
 }
 
@@ -807,7 +726,7 @@ function OverviewSlide({ report, exportable }: { report: ReturnType<typeof build
     <SlideShell title="Weekly QA/QC Report" icon={<Gauge size={18} />} exportable={exportable}>
       <div className="report-pills">
         <span>OAC Through {report.reportWeek.label}</span>
-        <span>{report.source === 'smartsheet' ? 'Smartsheet Live' : 'Preview Layout'}</span>
+        <span>{report.source === 'files' ? 'Imported Files' : 'Preview Layout'}</span>
         <span>Report Week {report.reportWeek.label}</span>
       </div>
       <div className="kpi-grid">
@@ -940,113 +859,131 @@ function FieldSlide({ report, exportable }: { report: ReturnType<typeof buildRep
 }
 
 function ConnectFirst({
-  onConnect,
+  imports,
+  onChoose,
+  onFiles,
   onPreview,
-  loading,
+  importing,
 }: {
-  onConnect: () => void
+  imports: Partial<Record<SheetRole, ImportedSheetFile>>
+  onChoose: () => void
+  onFiles: (files: File[]) => void
   onPreview: () => void
-  loading: boolean
+  importing: boolean
 }) {
+  const [dragging, setDragging] = useState(false)
+  const importCount = Object.keys(imports).length
+
   return (
-    <section className="connect-first">
+    <section
+      className={cx('connect-first', dragging && 'dragging')}
+      onDragEnter={(event) => {
+        event.preventDefault()
+        setDragging(true)
+      }}
+      onDragOver={(event) => event.preventDefault()}
+      onDragLeave={(event) => {
+        if (event.currentTarget === event.target) setDragging(false)
+      }}
+      onDrop={(event) => {
+        event.preventDefault()
+        setDragging(false)
+        onFiles(Array.from(event.dataTransfer.files))
+      }}
+    >
       <div className="connect-first-mark">
-        <Database size={34} />
+        <FileUp size={34} />
       </div>
-      <h2>Connect Smartsheet to generate the weekly report</h2>
-      <p>
-        The released app now starts clean. Once your token is saved, it will reconnect on launch and load the dashboard automatically.
-      </p>
+      <h2>Drop weekly Smartsheet exports</h2>
+      <p>{importCount}/4 required files ready</p>
       <div className="connect-first-actions">
-        <button className="button primary" type="button" onClick={onConnect}>
-          <KeyRound size={16} />
-          Connect Smartsheet
+        <button className="button primary" type="button" onClick={onChoose} disabled={importing}>
+          {importing ? <RefreshCw size={16} className="spin" /> : <Upload size={16} />}
+          Choose Files
         </button>
-        <button className="button secondary" type="button" onClick={onPreview} disabled={loading}>
+        <button className="button secondary" type="button" onClick={onPreview} disabled={importing}>
           <LineChart size={16} />
           Preview Layout
         </button>
       </div>
       <div className="connect-first-grid">
-        <span>BIM Issues Log</span>
-        <span>Mechanical / Process Inspection Log</span>
-        <span>Electrical Inspection Log</span>
-        <span>Welding Signoffs</span>
+        {(Object.keys(ROLE_CONFIG) as SheetRole[]).map((role) => {
+          const file = imports[role]
+          return (
+            <span className={cx(file && 'ready')} key={role}>
+              {file ? <CheckCircle2 size={14} /> : <FileSpreadsheet size={14} />}
+              {ROLE_CONFIG[role].label}
+            </span>
+          )
+        })}
       </div>
+      <small>.xls, .xlsx, and .csv</small>
     </section>
   )
 }
 
-function SheetPanel({
-  sheets,
-  mapping,
-  search,
-  setSearch,
-  onRoleChange,
-  connected,
+function ImportPanel({
+  imports,
+  onChoose,
+  onRemove,
+  onClear,
+  importing,
 }: {
-  sheets: SmartSheetSummary[]
-  mapping: Partial<Record<SheetRole, number>>
-  search: string
-  setSearch: (value: string) => void
-  onRoleChange: (role: SheetRole, sheetId: number) => void
-  connected: boolean
+  imports: Partial<Record<SheetRole, ImportedSheetFile>>
+  onChoose: () => void
+  onRemove: (role: SheetRole) => void
+  onClear: () => void
+  importing: boolean
 }) {
-  const visible = sheets.filter((sheet) => sheet.name.toLowerCase().includes(search.toLowerCase())).slice(0, 60)
+  const importCount = Object.keys(imports).length
   return (
     <aside className="sheet-panel">
-      <div className="panel-title">
-        <Database size={16} />
-        <h3>Smartsheet Files</h3>
+      <div className="import-panel-header">
+        <div className="panel-title">
+          <FileSpreadsheet size={16} />
+          <h3>Report Files</h3>
+        </div>
+        <strong>{importCount}/4</strong>
       </div>
-      <div className="search-box">
-        <Search size={15} />
-        <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search sheets" />
-      </div>
-      <div className="role-map">
+      <button className="button primary import-button" type="button" onClick={onChoose} disabled={importing}>
+        {importing ? <RefreshCw size={16} className="spin" /> : <Upload size={16} />}
+        Import Exports
+      </button>
+      <div className="import-role-list">
         {(Object.keys(ROLE_CONFIG) as SheetRole[]).map((role) => {
           const config = ROLE_CONFIG[role]
           const Icon = config.icon
+          const file = imports[role]
           return (
-            <label className="role-row" key={role}>
-              <span style={{ color: config.color }}>
+            <div className={cx('import-role-row', file && 'ready')} key={role}>
+              <span className="import-role-icon" style={{ color: config.color }}>
                 <Icon size={15} />
               </span>
-              <span>{config.label}</span>
-              <select
-                value={mapping[role] ?? ''}
-                disabled={!connected}
-                onChange={(event) => onRoleChange(role, Number(event.target.value))}
-              >
-                <option value="">Not linked</option>
-                {sheets.map((sheet) => (
-                  <option key={sheet.id} value={sheet.id}>
-                    {sheet.name}
-                  </option>
-                ))}
-              </select>
-            </label>
+              <div>
+                <strong>{config.label}</strong>
+                <span title={file?.fileName}>{file ? file.fileName : 'Not imported'}</span>
+                {file && <small>{file.rowCount.toLocaleString()} rows</small>}
+              </div>
+              {file ? (
+                <button className="icon-button compact" type="button" onClick={() => onRemove(role)} aria-label={`Remove ${config.label}`} title="Remove file">
+                  <Trash2 size={14} />
+                </button>
+              ) : (
+                <FileSpreadsheet className="missing-file-icon" size={15} />
+              )}
+            </div>
           )
         })}
       </div>
-      <div className="sheet-list">
-        {visible.length === 0 ? (
-          <div className="empty-sheet-list">
-            <FileSpreadsheet size={18} />
-            <span>{connected ? 'No sheets found' : 'Connect Smartsheet'}</span>
-          </div>
-        ) : (
-          visible.map((sheet) => {
-            const linked = Object.values(mapping).includes(sheet.id)
-            return (
-              <div className="sheet-row" key={sheet.id}>
-                <FileSpreadsheet size={15} />
-                <span>{sheet.name}</span>
-                {linked && <CheckCircle2 size={14} />}
-              </div>
-            )
-          })
-        )}
+      {importCount > 0 && (
+        <button className="clear-imports" type="button" onClick={onClear}>
+          <Trash2 size={14} />
+          Clear all files
+        </button>
+      )}
+      <div className="local-data-note">
+        <ShieldCheck size={15} />
+        <span>Spreadsheet data remains in this browser session.</span>
       </div>
     </aside>
   )
@@ -1056,21 +993,18 @@ export default function App() {
   const [bundle, setBundle] = useState<SheetBundle>(EMPTY_BUNDLE)
   const [filters, setFilters] = useState<ReportFilters>(() => mergeFilters(loadFilters()))
   const [activeSlide, setActiveSlide] = useState<'overview' | 'issues' | 'field'>('overview')
-  const [connectOpen, setConnectOpen] = useState(false)
-  const [loading, setLoading] = useState(false)
+  const [imports, setImports] = useState<Partial<Record<SheetRole, ImportedSheetFile>>>({})
+  const [importing, setImporting] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [pdfExporting, setPdfExporting] = useState(false)
   const [sheetPanelOpen, setSheetPanelOpen] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [sheets, setSheets] = useState<SmartSheetSummary[]>([])
-  const [sheetSearch, setSheetSearch] = useState('')
-  const [mapping, setMapping] = useState<Partial<Record<SheetRole, number>>>(() => loadSheetMapping())
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null)
   const [updateOpen, setUpdateOpen] = useState(false)
-  const tokenMeta = loadTokenMeta()
-  const savedToken = loadSmartsheetToken()
-  const connected = bundle.source === 'smartsheet'
-  const hasReport = bundle.source === 'smartsheet' || bundle.source === 'demo'
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const importCount = Object.keys(imports).length
+  const filesReady = importCount === 4
+  const hasReport = bundle.source === 'files' || bundle.source === 'demo'
   const showSheetPanel = !hasReport || sheetPanelOpen
 
   const report = useMemo(() => buildReportModel(bundle, filters, new Date()), [bundle, filters])
@@ -1078,6 +1012,10 @@ export default function App() {
   useEffect(() => {
     saveFilters(filters)
   }, [filters])
+
+  useEffect(() => {
+    clearLegacyConnectionData()
+  }, [])
 
   useEffect(() => {
     if (!import.meta.env.PROD) return
@@ -1089,72 +1027,57 @@ export default function App() {
     })
   }, [])
 
-  async function connect(token: string, remember: boolean): Promise<void> {
-    setLoading(true)
+  function bundleForImports(next: Partial<Record<SheetRole, ImportedSheetFile>>): SheetBundle {
+    const complete = (Object.keys(ROLE_CONFIG) as SheetRole[]).every((role) => Boolean(next[role]))
+    return {
+      source: complete ? 'files' : 'empty',
+      sheets: {
+        bimIssues: next.bimIssues?.sheet ?? EMPTY_BUNDLE.sheets.bimIssues,
+        mechanical: next.mechanical?.sheet ?? EMPTY_BUNDLE.sheets.mechanical,
+        electrical: next.electrical?.sheet ?? EMPTY_BUNDLE.sheets.electrical,
+        welding: next.welding?.sheet ?? EMPTY_BUNDLE.sheets.welding,
+      },
+    }
+  }
+
+  async function handleFiles(files: File[]): Promise<void> {
+    if (files.length === 0) return
+    setImporting(true)
     setError(null)
     try {
-      const sheetList = await listSmartsheets(token)
-      const autoMapping = { ...autoMapSheets(sheetList), ...loadSheetMapping() }
-      const loaded = await loadMappedSheets(token, autoMapping)
-      const nextBundle: SheetBundle = {
-        source: 'smartsheet',
-        sheets: {
-          ...EMPTY_BUNDLE.sheets,
-          ...loaded,
-        },
-      }
-      if (remember) saveSmartsheetToken(token)
-      setSheets(sheetList)
-      setMapping(autoMapping)
-      saveSheetMapping(autoMapping)
-      setBundle(nextBundle)
-      setSheetPanelOpen(false)
-      setConnectOpen(false)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to connect to Smartsheet.')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  async function refreshFromSaved(): Promise<void> {
-    const token = loadSmartsheetToken()
-    if (!token) {
-      setConnectOpen(true)
-      return
-    }
-    await connect(token, true)
-  }
-
-  useEffect(() => {
-    if (savedToken) void refreshFromSaved()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  async function handleRoleChange(role: SheetRole, sheetId: number): Promise<void> {
-    const token = loadSmartsheetToken()
-    const next = { ...mapping, [role]: sheetId }
-    setMapping(next)
-    saveSheetMapping(next)
-    if (!token) return
-    setLoading(true)
-    try {
-      const loaded = await loadMappedSheets(token, next)
-      setBundle({
-        source: 'smartsheet',
-        sheets: { ...EMPTY_BUNDLE.sheets, ...loaded },
+      const results = await Promise.allSettled(files.map(importSpreadsheet))
+      const next = { ...imports }
+      const errors: string[] = []
+      results.forEach((result) => {
+        if (result.status === 'fulfilled') next[result.value.role] = result.value
+        else errors.push(result.reason instanceof Error ? result.reason.message : 'A spreadsheet could not be imported.')
       })
+      const nextBundle = bundleForImports(next)
+      setImports(next)
+      setBundle(nextBundle)
+      setActiveSlide('overview')
+      if (nextBundle.source === 'files') setSheetPanelOpen(false)
+      if (errors.length > 0) {
+        setError(errors.join(' '))
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to load mapped sheet.')
+      setError(err instanceof Error ? err.message : 'Unable to import the selected spreadsheets.')
     } finally {
-      setLoading(false)
+      setImporting(false)
     }
   }
 
-  function clearAuth(): void {
-    clearSmartsheetToken()
+  function removeImport(role: SheetRole): void {
+    const next = { ...imports }
+    delete next[role]
+    setImports(next)
+    setBundle(bundleForImports(next))
+    setSheetPanelOpen(true)
+  }
+
+  function clearImports(): void {
+    setImports({})
     setBundle(EMPTY_BUNDLE)
-    setSheets([])
     setSheetPanelOpen(true)
     setError(null)
   }
@@ -1167,6 +1090,17 @@ export default function App() {
 
   return (
     <div className="app">
+      <input
+        ref={fileInputRef}
+        className="file-input"
+        type="file"
+        accept=".xls,.xlsx,.csv"
+        multiple
+        onChange={(event) => {
+          void handleFiles(Array.from(event.target.files ?? []))
+          event.target.value = ''
+        }}
+      />
       <header className="app-header">
         <div className="brand-block">
           <div className="brand-mark">
@@ -1174,13 +1108,13 @@ export default function App() {
           </div>
           <div>
             <h1>QA/QC Intelligence</h1>
-            <p>{hasReport ? `Weekly report through ${report.reportWeek.label}` : 'Connect Smartsheet to generate a report'}</p>
+            <p>{hasReport ? `Weekly report through ${report.reportWeek.label}` : 'Import weekly exports to generate a report'}</p>
           </div>
         </div>
         <div className="header-pills">
-          <span className={cx('live-pill', connected && 'connected')}>
-            <Database size={14} />
-            {connected ? 'Smartsheet Live' : bundle.source === 'demo' ? 'Preview Layout' : 'Not Connected'}
+          <span className={cx('live-pill', filesReady && 'connected')}>
+            <FileSpreadsheet size={14} />
+            {bundle.source === 'demo' ? 'Preview Layout' : `${importCount}/4 Files Ready`}
           </span>
           <span>
             <CalendarClock size={14} />
@@ -1204,16 +1138,12 @@ export default function App() {
               aria-pressed={sheetPanelOpen}
             >
               {sheetPanelOpen ? <PanelLeftClose size={16} /> : <PanelLeftOpen size={16} />}
-              {sheetPanelOpen ? 'Hide Sheets' : 'Sheets'}
+              {sheetPanelOpen ? 'Hide Files' : 'Files'}
             </button>
           )}
-          <button className="icon-button labeled" type="button" onClick={() => setConnectOpen(true)}>
-            <KeyRound size={16} />
-            {connected ? 'Auth' : 'Connect'}
-          </button>
-          <button className="icon-button labeled" type="button" onClick={refreshFromSaved} disabled={loading}>
-            <RefreshCw size={16} className={cx(loading && 'spin')} />
-            Refresh
+          <button className="icon-button labeled" type="button" onClick={() => fileInputRef.current?.click()} disabled={importing}>
+            {importing ? <RefreshCw size={16} className="spin" /> : <Upload size={16} />}
+            Import Files
           </button>
           <button
             className="button primary"
@@ -1309,13 +1239,12 @@ export default function App() {
 
       <main className={cx('workspace', hasReport && !showSheetPanel && 'workspace-expanded')}>
         {showSheetPanel && (
-          <SheetPanel
-            sheets={sheets}
-            mapping={mapping}
-            search={sheetSearch}
-            setSearch={setSheetSearch}
-            onRoleChange={(role, sheetId) => void handleRoleChange(role, sheetId)}
-            connected={connected}
+          <ImportPanel
+            imports={imports}
+            onChoose={() => fileInputRef.current?.click()}
+            onRemove={removeImport}
+            onClear={clearImports}
+            importing={importing}
           />
         )}
         <section className="report-workspace">
@@ -1339,8 +1268,10 @@ export default function App() {
             </>
           ) : (
             <ConnectFirst
-              loading={loading}
-              onConnect={() => setConnectOpen(true)}
+              imports={imports}
+              importing={importing}
+              onChoose={() => fileInputRef.current?.click()}
+              onFiles={(files) => void handleFiles(files)}
               onPreview={() => {
                 setBundle(PREVIEW_BUNDLE)
                 setActiveSlide('overview')
@@ -1351,13 +1282,6 @@ export default function App() {
         </section>
       </main>
 
-      <ConnectModal
-        open={connectOpen}
-        onClose={() => setConnectOpen(false)}
-        onConnect={(token, remember) => void connect(token, remember)}
-        savedLabel={tokenMeta?.masked}
-        loading={loading}
-      />
       <UpdateModal open={updateOpen} onClose={() => setUpdateOpen(false)} info={updateInfo} />
 
       {hasReport && (
@@ -1366,13 +1290,6 @@ export default function App() {
           <IssueTableSlide report={report} exportable />
           <FieldSlide report={report} exportable />
         </div>
-      )}
-
-      {savedToken && (
-        <button className="forget-token" type="button" onClick={clearAuth}>
-          <Unlink size={14} />
-          Forget token
-        </button>
       )}
     </div>
   )

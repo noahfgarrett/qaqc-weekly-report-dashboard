@@ -47,6 +47,10 @@ select:disabled {
   opacity: 0.58;
 }
 
+.file-input {
+  display: none;
+}
+
 .app {
   min-height: 100vh;
   padding: 18px;
@@ -327,92 +331,123 @@ select:disabled {
   margin: 0;
 }
 
-.search-box {
+.import-panel-header {
   align-items: center;
-  background: #f3f7fa;
-  border: 1px solid #dfe7ef;
-  border-radius: 16px;
   display: flex;
-  gap: 8px;
-  margin: 14px 0;
-  padding: 0 11px;
+  justify-content: space-between;
+  margin-bottom: 14px;
 }
 
-.search-box input {
-  background: transparent;
-  border: 0;
-  color: var(--text);
-  height: 38px;
-  min-width: 0;
-  outline: 0;
+.import-panel-header > strong {
+  background: #eef4f8;
+  border-radius: 999px;
+  color: var(--graphite);
+  font-size: 12px;
+  padding: 6px 9px;
+}
+
+.import-button {
+  margin-bottom: 14px;
   width: 100%;
 }
 
-.role-map {
+.import-role-list {
   display: grid;
-  gap: 9px;
+  gap: 10px;
   margin-bottom: 16px;
 }
 
-.role-row {
+.import-role-row {
+  align-items: center;
   background: #f8fafc;
   border: 1px solid #e5edf3;
   border-radius: 16px;
   display: grid;
-  gap: 8px;
-  grid-template-columns: 18px 1fr;
-  padding: 9px;
+  gap: 9px;
+  grid-template-columns: 28px minmax(0, 1fr) 32px;
+  min-height: 82px;
+  padding: 11px;
 }
 
-.role-row select {
+.import-role-row.ready {
+  background: rgba(20, 184, 166, 0.06);
+  border-color: rgba(20, 184, 166, 0.25);
+}
+
+.import-role-icon {
+  align-items: center;
   background: var(--white);
-  border: 1px solid #dfe7ef;
-  border-radius: 12px;
-  color: var(--graphite);
-  grid-column: 1 / -1;
-  height: 34px;
-  padding: 0 8px;
-  width: 100%;
-}
-
-.role-row span {
-  align-items: center;
+  border-radius: 9px;
   display: flex;
-  font-size: 12px;
-  font-weight: 850;
+  height: 28px;
+  justify-content: center;
+  width: 28px;
 }
 
-.sheet-list {
+.import-role-row > div {
   display: grid;
-  gap: 6px;
-  max-height: 278px;
-  overflow-y: auto;
-  padding-right: 4px;
+  gap: 3px;
+  min-width: 0;
 }
 
-.sheet-row,
-.empty-sheet-list {
-  align-items: center;
-  background: #f8fafc;
-  border-radius: 13px;
-  color: var(--muted);
-  display: flex;
+.import-role-row strong {
   font-size: 12px;
-  font-weight: 750;
-  gap: 8px;
-  min-height: 34px;
-  padding: 7px 9px;
+  line-height: 1.25;
 }
 
-.sheet-row span {
-  flex: 1;
+.import-role-row span:not(.import-role-icon),
+.import-role-row small {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 750;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.sheet-row svg:last-child {
+.import-role-row small {
+  color: #0f766e;
+}
+
+.icon-button.compact {
+  min-height: 32px;
+  min-width: 32px;
+  padding: 0;
+}
+
+.missing-file-icon {
+  color: #a8b4c1;
+  justify-self: center;
+}
+
+.clear-imports {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: var(--muted);
+  display: flex;
+  font-size: 11px;
+  font-weight: 850;
+  gap: 7px;
+  margin: 0 auto 16px;
+}
+
+.local-data-note {
+  align-items: flex-start;
+  background: #eef4f8;
+  border-radius: 14px;
+  color: var(--muted);
+  display: flex;
+  font-size: 10px;
+  font-weight: 750;
+  gap: 8px;
+  line-height: 1.4;
+  padding: 10px;
+}
+
+.local-data-note svg {
   color: var(--teal);
+  flex: 0 0 auto;
 }
 
 .report-workspace {
@@ -433,6 +468,13 @@ select:disabled {
   min-height: 640px;
   padding: 54px;
   text-align: center;
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.connect-first.dragging {
+  border-color: var(--teal);
+  box-shadow: 0 28px 90px rgba(20, 184, 166, 0.2);
+  transform: translateY(-2px);
 }
 
 .connect-first-mark {
@@ -479,13 +521,30 @@ select:disabled {
 }
 
 .connect-first-grid span {
+  align-items: center;
   background: #eef4f8;
   border: 1px solid #dce5ee;
   border-radius: 999px;
   color: var(--graphite);
+  display: flex;
   font-size: 12px;
   font-weight: 900;
+  gap: 7px;
+  justify-content: center;
   padding: 10px 12px;
+}
+
+.connect-first-grid span.ready {
+  background: rgba(20, 184, 166, 0.1);
+  border-color: rgba(20, 184, 166, 0.28);
+  color: #0f766e;
+}
+
+.connect-first > small {
+  color: #8492a3;
+  font-size: 11px;
+  font-weight: 800;
+  margin-top: 14px;
 }
 
 .slide-tabs {
@@ -1464,6 +1523,10 @@ select:disabled {
 @media (max-width: 1320px) {
   .workspace {
     grid-template-columns: 300px minmax(0, 1fr);
+  }
+
+  .workspace.workspace-expanded {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .header-pills {
