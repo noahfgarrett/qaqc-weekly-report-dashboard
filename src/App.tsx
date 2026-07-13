@@ -430,17 +430,27 @@ function ChartTooltip({
 function RangeChart({ data }: { data: WeeklyIssuePoint[] }) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
   const visible = data.slice(-30)
-  const { max, ticks } = niceScale(Math.max(1, ...visible.flatMap((point) => [point.opened, point.closed, point.remainingOpen])))
   const width = 980
   const height = 360
-  const pad = { l: 46, r: 22, t: 20, b: 44 }
+  const pad = { l: 46, r: 22 }
   const chartW = width - pad.l - pad.r
-  const chartH = height - pad.t - pad.b
   const group = chartW / Math.max(visible.length, 1)
-  const toY = (value: number) => pad.t + chartH - (value / max) * chartH
+  // Two stacked plots sharing the work-week x-axis, each with its own scale, so
+  // the backlog line and the weekly bars are both legible (no dual y-axis).
+  const lineTop = 16
+  const lineH = 166
+  const barTop = 214
+  const barH = 104
+  const xLabelY = height - 8
+  const lineScale = niceScale(Math.max(1, ...visible.map((point) => point.remainingOpen)), 3)
+  const barScale = niceScale(Math.max(1, ...visible.flatMap((point) => [point.opened, point.closed])), 2)
+  const toYLine = (value: number) => lineTop + lineH - (value / lineScale.max) * lineH
+  const toYBar = (value: number) => barTop + barH - (value / barScale.max) * barH
+  const columnTop = lineTop
+  const columnH = barTop + barH - lineTop
   const points = visible.map((point, index) => ({
     x: pad.l + index * group + group / 2,
-    y: toY(point.remainingOpen),
+    y: toYLine(point.remainingOpen),
     point,
   }))
   const hovered = hoveredIndex === null ? null : visible[hoveredIndex]
@@ -450,9 +460,9 @@ function RangeChart({ data }: { data: WeeklyIssuePoint[] }) {
     <div className="chart-shell">
       <div className="chart-topline">
         <div className="chart-legend">
+          <span className="legend-remaining">Remaining Open</span>
           <span className="legend-opened">Opened</span>
           <span className="legend-closed">Closed</span>
-          <span className="legend-remaining">Remaining Open</span>
         </div>
         <span className="chart-window">Last {visible.length} reporting weeks</span>
       </div>
@@ -463,55 +473,68 @@ function RangeChart({ data }: { data: WeeklyIssuePoint[] }) {
             <stop offset="100%" stopColor="#c2870b" stopOpacity="0" />
           </linearGradient>
         </defs>
-        {ticks.map((tick) => (
-          <g key={tick}>
-            <line
-            x1={pad.l}
-            x2={width - pad.r}
-            y1={toY(tick)}
-            y2={toY(tick)}
-            className="grid-line"
-            />
-            <text className="tick-label" x={pad.l - 10} y={toY(tick) + 4} textAnchor="end">{chartValue(tick)}</text>
+
+        {/* Latest-week highlight + hover targets span the full column */}
+        {visible.map((point, index) => {
+          const isLatest = index === visible.length - 1
+          return (
+            <g key={`hit-${point.workWeek}`} onMouseEnter={() => setHoveredIndex(index)} onMouseLeave={() => setHoveredIndex(null)}>
+              {isLatest && <rect className="report-week-band" x={pad.l + index * group} y={columnTop} width={group} height={columnH} rx="6" />}
+              <rect className="chart-hit-area" x={pad.l + index * group} y={columnTop} width={group} height={columnH} />
+            </g>
+          )
+        })}
+
+        {/* Top plot: Remaining Open backlog line */}
+        {lineScale.ticks.map((tick) => (
+          <g key={`l-${tick}`}>
+            <line x1={pad.l} x2={width - pad.r} y1={toYLine(tick)} y2={toYLine(tick)} className="grid-line" />
+            <text className="tick-label" x={pad.l - 8} y={toYLine(tick) + 4} textAnchor="end">{chartValue(tick)}</text>
           </g>
         ))}
+        <text className="chart-subhead" x={pad.l} y={lineTop - 4}>Remaining open</text>
+        <path d={areaPath(points, lineTop + lineH)} className="remaining-area" />
+        <path d={smoothPath(points)} className="remaining-line" fill="none" />
+        {points.map(({ x, y, point }) => (
+          <circle key={point.workWeek} cx={x} cy={y} r={point === hovered ? 5 : 3} className="remaining-dot" />
+        ))}
+        {points.length > 0 && (
+          <text className="series-end-label" x={points[points.length - 1].x - 8} y={Math.max(lineTop + 12, points[points.length - 1].y - 10)} textAnchor="end">
+            {`Open ${points[points.length - 1].point.remainingOpen}`}
+          </text>
+        )}
+
+        {/* Bottom plot: weekly Opened / Closed bars */}
+        {barScale.ticks.map((tick) => (
+          <g key={`b-${tick}`}>
+            <line x1={pad.l} x2={width - pad.r} y1={toYBar(tick)} y2={toYBar(tick)} className="grid-line" />
+            <text className="tick-label" x={pad.l - 8} y={toYBar(tick) + 4} textAnchor="end">{chartValue(tick)}</text>
+          </g>
+        ))}
+        <text className="chart-subhead" x={pad.l} y={barTop - 8}>Opened / Closed per week</text>
         {visible.map((point, index) => {
           const baseX = pad.l + index * group + group * 0.2
-          const openedH = (point.opened / max) * chartH
-          const closedH = (point.closed / max) * chartH
+          const openedH = (point.opened / barScale.max) * barH
+          const closedH = (point.closed / barScale.max) * barH
           const isActive = index === hoveredIndex
           const isLatest = index === visible.length - 1
           return (
-            <g key={point.workWeek} onMouseEnter={() => setHoveredIndex(index)} onMouseLeave={() => setHoveredIndex(null)}>
-              {isLatest && <rect className="report-week-band" x={pad.l + index * group} y={pad.t} width={group} height={chartH} rx="8" />}
-              <rect className="chart-hit-area" x={pad.l + index * group} y={pad.t} width={group} height={chartH} />
-              <rect className="bar opened" x={baseX} y={pad.t + chartH - openedH} width={group * 0.22} height={openedH} rx="3" />
-              <rect className="bar closed" x={baseX + group * 0.32} y={pad.t + chartH - closedH} width={group * 0.22} height={closedH} rx="3" />
-              {(isActive || isLatest) && point.opened > 0 && <text className="bar-value" x={baseX + group * 0.11} y={toY(point.opened) - 6} textAnchor="middle">{point.opened}</text>}
-              {(isActive || isLatest) && point.closed > 0 && <text className="bar-value" x={baseX + group * 0.43} y={toY(point.closed) - 6} textAnchor="middle">{point.closed}</text>}
-              {(index % 5 === 0 || index === visible.length - 1) && (
-                <text x={pad.l + index * group + group / 2} y={height - 24} textAnchor="middle">
-                  {point.workWeek.replace('WW', '')}
-                </text>
+            <g key={point.workWeek}>
+              <rect className="bar opened" x={baseX} y={barTop + barH - openedH} width={group * 0.22} height={openedH} rx="2" />
+              <rect className="bar closed" x={baseX + group * 0.32} y={barTop + barH - closedH} width={group * 0.22} height={closedH} rx="2" />
+              {(isActive || isLatest) && point.opened > 0 && <text className="bar-value" x={baseX + group * 0.11} y={toYBar(point.opened) - 5} textAnchor="middle">{point.opened}</text>}
+              {(isActive || isLatest) && point.closed > 0 && <text className="bar-value" x={baseX + group * 0.43} y={toYBar(point.closed) - 5} textAnchor="middle">{point.closed}</text>}
+              {(index % 5 === 0 || isLatest) && (
+                <text x={pad.l + index * group + group / 2} y={xLabelY} textAnchor="middle">{point.workWeek.replace('WW', '')}</text>
               )}
             </g>
           )
         })}
-        <path d={areaPath(points, pad.t + chartH)} className="remaining-area" />
-        <path d={smoothPath(points)} className="remaining-line" fill="none" />
-        {points.map(({ x, y, point }) => (
-          <circle key={point.workWeek} cx={x} cy={y} r={point === hovered ? 5 : 3.5} className="remaining-dot" />
-        ))}
-        {points.length > 0 && (
-          <text className="series-end-label" x={points[points.length - 1].x - 8} y={Math.max(pad.t + 12, points[points.length - 1].y - 10)} textAnchor="end">
-            {`Open ${points[points.length - 1].point.remainingOpen}`}
-          </text>
-        )}
       </svg>
       {hovered && hoveredPoint && (
         <ChartTooltip
           title={hovered.workWeek}
-          entries={[`Opened ${hovered.opened}`, `Closed ${hovered.closed}`, `Remaining ${hovered.remainingOpen}`]}
+          entries={[`Remaining ${hovered.remainingOpen}`, `Opened ${hovered.opened}`, `Closed ${hovered.closed}`]}
           xPercent={(hoveredPoint.x / width) * 100}
         />
       )}

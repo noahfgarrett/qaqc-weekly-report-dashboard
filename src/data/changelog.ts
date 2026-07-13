@@ -7,6 +7,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.0.8',
+    date: '2026-07-13T20:03:00Z',
+    type: 'feature',
+    notes: [
+      'Issues by Work Week is now two stacked charts sharing the work-week axis: the Remaining Open backlog line on top and the weekly Opened and Closed bars below, each on its own scale',
+      'Weekly opened and closed bars are now clearly readable instead of being flattened beneath the much larger backlog line',
+      'The exported PPTX and PDF deck use the same stacked layout',
+    ],
+  },
+  {
     version: '1.0.7',
     date: '2026-07-13T19:52:14Z',
     type: 'feature',

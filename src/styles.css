@@ -1149,6 +1149,14 @@ select:disabled {
   white-space: nowrap;
 }
 
+.chart-subhead {
+  fill: var(--muted);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
 /* Solid hairline gridlines, horizontal only, recessive */
 .grid-line {
   stroke: var(--hairline);

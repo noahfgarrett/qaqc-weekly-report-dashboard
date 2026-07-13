@@ -186,69 +186,78 @@ function addLine(slide: pptxgen.Slide, x1: number, y1: number, x2: number, y2: n
 
 function addIssueTrend(slide: pptxgen.Slide, data: WeeklyIssuePoint[], x: number, y: number, w: number, h: number): void {
   addPanel(slide, x, y, w, h, 'Issues by Work Week')
-  const chartX = x + 0.35
-  const chartY = y + 0.5
-  const chartW = w - 0.62
-  const chartH = h - 0.98
   const visible = data.slice(-30)
+  const chartX = x + 0.42
+  const chartW = w - 0.72
+  const groupW = chartW / Math.max(visible.length, 1)
   const maxBar = maxOf(visible.flatMap((d) => [d.opened, d.closed]))
   const maxLine = maxOf(visible.map((d) => d.remainingOpen))
-  const groupW = chartW / visible.length
+  // Two stacked plots sharing the x-axis (no dual y-axis), matching the app.
+  const lineTop = y + 0.5
+  const lineH = h - 1.98
+  const barTop = y + h - 1.12
+  const barH = h - 2.28
 
-  addLine(slide, chartX, chartY + chartH, chartX + chartW, chartY + chartH, 'D8DEE7', 0.7)
-  visible.forEach((point, index) => {
-    const gx = chartX + index * groupW + groupW * 0.18
-    const openedH = (point.opened / maxBar) * (chartH * 0.68)
-    const closedH = (point.closed / maxBar) * (chartH * 0.68)
-    slide.addShape('roundRect', {
-      x: gx,
-      y: chartY + chartH - openedH,
-      w: groupW * 0.25,
-      h: openedH,
-      rectRadius: 0.02,
-      fill: { color: C.cyan },
-      line: { color: C.cyan },
-    })
-    slide.addShape('roundRect', {
-      x: gx + groupW * 0.3,
-      y: chartY + chartH - closedH,
-      w: groupW * 0.25,
-      h: closedH,
-      rectRadius: 0.02,
-      fill: { color: C.mint },
-      line: { color: C.mint },
-    })
-    if (index % 3 === 0 || index === visible.length - 1) {
-      slide.addText(point.workWeek.replace('WW', ''), {
-        x: chartX + index * groupW - 0.02,
-        y: chartY + chartH + 0.06,
-        w: 0.36,
-        h: 0.1,
-        fontSize: 5.2,
-        color: C.muted,
-        rotate: 315,
-        margin: 0,
-      })
-    }
-  })
-
-  visible.forEach((point, index) => {
-    if (index === 0) return
-    const prev = visible[index - 1]
-    const x1 = chartX + (index - 0.5) * groupW
-    const y1 = chartY + chartH - (prev.remainingOpen / maxLine) * (chartH * 0.82)
-    const x2 = chartX + (index + 0.5) * groupW
-    const y2 = chartY + chartH - (point.remainingOpen / maxLine) * (chartH * 0.82)
-    addLine(slide, x1, y1, x2, y2, C.amber, 1.4)
-  })
-  slide.addText('Opened   Closed   Remaining Open', {
-    x: x + 0.35,
+  slide.addText('Remaining Open   Opened   Closed', {
+    x: x + 0.42,
     y: y + 0.31,
-    w: 2.5,
+    w: 3,
     h: 0.11,
     fontSize: 6,
     color: C.muted,
     margin: 0,
+  })
+
+  // Top plot: Remaining Open backlog line
+  addLine(slide, chartX, lineTop + lineH, chartX + chartW, lineTop + lineH, 'D8DEE7', 0.7)
+  visible.forEach((point, index) => {
+    if (index === 0) return
+    const prev = visible[index - 1]
+    addLine(
+      slide,
+      chartX + (index - 0.5) * groupW,
+      lineTop + lineH - (prev.remainingOpen / maxLine) * lineH,
+      chartX + (index + 0.5) * groupW,
+      lineTop + lineH - (point.remainingOpen / maxLine) * lineH,
+      C.amber,
+      1.4,
+    )
+  })
+  const last = visible[visible.length - 1]
+  if (last) {
+    slide.addText(`Open ${last.remainingOpen}`, {
+      x: chartX + chartW - 0.95,
+      y: Math.max(lineTop, lineTop + lineH - (last.remainingOpen / maxLine) * lineH - 0.17),
+      w: 0.9,
+      h: 0.12,
+      fontSize: 6.5,
+      bold: true,
+      color: C.amber,
+      align: 'right',
+      margin: 0,
+    })
+  }
+
+  // Bottom plot: weekly Opened / Closed bars
+  addLine(slide, chartX, barTop + barH, chartX + chartW, barTop + barH, 'D8DEE7', 0.7)
+  visible.forEach((point, index) => {
+    const gx = chartX + index * groupW + groupW * 0.2
+    const openedH = (point.opened / maxBar) * barH
+    const closedH = (point.closed / maxBar) * barH
+    slide.addShape('roundRect', { x: gx, y: barTop + barH - openedH, w: groupW * 0.24, h: openedH, rectRadius: 0.02, fill: { color: C.cyan }, line: { color: C.cyan } })
+    slide.addShape('roundRect', { x: gx + groupW * 0.3, y: barTop + barH - closedH, w: groupW * 0.24, h: closedH, rectRadius: 0.02, fill: { color: C.mint }, line: { color: C.mint } })
+    if (index % 5 === 0 || index === visible.length - 1) {
+      slide.addText(point.workWeek.replace('WW', ''), {
+        x: chartX + index * groupW - 0.06,
+        y: barTop + barH + 0.05,
+        w: 0.44,
+        h: 0.1,
+        fontSize: 5,
+        color: C.muted,
+        align: 'center',
+        margin: 0,
+      })
+    }
   })
 }
 
