@@ -7,41 +7,53 @@ const SLIDE_H = 7.5
 const SAFE_TOP = 0.58
 const SAFE_BOTTOM = 0.54
 const SAFE_H = SLIDE_H - SAFE_TOP - SAFE_BOTTOM
+// Mirrors DESIGN.md tokens. Series keys keep their old names but new semantic
+// values so existing draw calls remap: cyan=Opened(red), mint=Closed(green),
+// amber=Remaining, teal=brand series (slate-blue), coral=alert.
 const C = {
-  obsidian: '101720',
-  graphite: '27313D',
-  text: '17212B',
-  muted: '667382',
-  faint: 'E8EDF2',
-  surface: 'F8FAFC',
+  ink: '1B2530',
+  graphite: '28323F',
+  text: '1B2530',
+  muted: '6A7583',
+  faint: 'DCE3EC',
+  hairline: 'EBEEF3',
+  panel: 'F2F5F9',
+  surface: 'F7F9FC',
   white: 'FFFFFF',
-  teal: '14B8A6',
-  cyan: '38BDF8',
-  mint: '22C55E',
-  amber: 'F59E0B',
-  coral: 'F05252',
+  accent: '2E5AAC',
+  accentStrong: '244A93',
+  accentSoft: 'EAF0FA',
+  track: 'E4E9F0',
+  teal: '2E5AAC',
+  cyan: 'EC6152',
+  mint: '0D6331',
+  amber: 'C2870B',
+  coral: 'D03B3B',
+  obsidian: '1B2530',
 }
 
 function addHeader(slide: pptxgen.Slide, title: string, report: ReportModel): void {
   slide.background = { color: C.white }
+  // Slate-blue brand mark, matching the app header
   slide.addShape('roundRect', {
-    x: 0.42,
+    x: 0.55,
     y: SAFE_TOP,
-    w: 12.5,
-    h: 0.54,
+    w: 0.44,
+    h: 0.44,
     rectRadius: 0.08,
-    fill: { color: C.obsidian },
-    line: { color: C.obsidian },
+    fill: { color: C.accent },
+    line: { color: C.accent },
   })
   slide.addText(title, {
-    x: 0.7,
-    y: SAFE_TOP + 0.11,
-    w: 4.4,
-    h: 0.25,
+    x: 1.12,
+    y: SAFE_TOP + 0.02,
+    w: 6.0,
+    h: 0.4,
     fontFace: 'Aptos Display',
     fontSize: 18,
     bold: true,
-    color: C.white,
+    color: C.text,
+    valign: 'middle',
     margin: 0,
   })
   const pills = [
@@ -51,26 +63,29 @@ function addHeader(slide: pptxgen.Slide, title: string, report: ReportModel): vo
   ]
   pills.forEach((pill, index) => {
     slide.addShape('roundRect', {
-      x: 7.05 + index * 1.72,
-      y: SAFE_TOP + 0.13,
-      w: 1.54,
-      h: 0.27,
-      rectRadius: 0.08,
-      fill: { color: index === 0 ? '153D47' : '1A2530', transparency: 0 },
-      line: { color: '2E3B47', transparency: 20 },
+      x: 7.05 + index * 1.78,
+      y: SAFE_TOP + 0.09,
+      w: 1.62,
+      h: 0.28,
+      rectRadius: 0.06,
+      fill: { color: C.panel },
+      line: { color: C.faint },
     })
     slide.addText(pill, {
-      x: 7.13 + index * 1.72,
-      y: SAFE_TOP + 0.185,
-      w: 1.38,
-      h: 0.12,
+      x: 7.11 + index * 1.78,
+      y: SAFE_TOP + 0.145,
+      w: 1.5,
+      h: 0.14,
       fontSize: 6.8,
-      color: C.white,
+      color: C.muted,
       bold: true,
+      align: 'center',
       margin: 0,
       fit: 'shrink',
     })
   })
+  // Hairline under the header
+  addLine(slide, 0.55, SAFE_TOP + 0.54, 12.78, SAFE_TOP + 0.54, C.faint, 1)
 }
 
 function addFooter(slide: pptxgen.Slide, report: ReportModel): void {
@@ -85,7 +100,7 @@ function addFooter(slide: pptxgen.Slide, report: ReportModel): void {
   })
 }
 
-function addKpiCard(slide: pptxgen.Slide, x: number, y: number, w: number, label: string, value: string, delta: string, color = C.teal): void {
+function addKpiCard(slide: pptxgen.Slide, x: number, y: number, w: number, label: string, value: string, delta: string, color = C.accent): void {
   slide.addShape('roundRect', {
     x,
     y,
@@ -95,14 +110,6 @@ function addKpiCard(slide: pptxgen.Slide, x: number, y: number, w: number, label
     fill: { color: C.surface },
     line: { color: C.faint },
     shadow: { type: 'outer', color: 'CBD5E1', opacity: 0.13, blur: 1, angle: 45, offset: 1 },
-  })
-  slide.addShape('rect', {
-    x,
-    y,
-    w: 0.05,
-    h: 0.76,
-    fill: { color },
-    line: { color },
   })
   slide.addText(label, {
     x: x + 0.14,
@@ -299,6 +306,7 @@ function addAging(slide: pptxgen.Slide, data: AgingBucket[], x: number, y: numbe
 
 function addSimpleLine(slide: pptxgen.Slide, data: ElectricalPoint[], x: number, y: number, w: number, h: number): void {
   addPanel(slide, x, y, w, h, 'Electrical Inspections by Work Week')
+  slide.addText('Final Inspections   Issue Found', { x: x + 0.45, y: y + 0.32, w: 2.8, h: 0.11, fontSize: 6, color: C.muted, margin: 0 })
   const chartX = x + 0.45
   const chartY = y + 0.58
   const chartW = w - 0.78
@@ -345,38 +353,29 @@ function addWelding(slide: pptxgen.Slide, data: WeldingPoint[], x: number, y: nu
   const chartW = w - 0.75
   const chartH = h - 1.05
   const visible = data.slice(-24)
-  const maxY = maxOf(visible.flatMap((d) => [d.signed, d.total]))
+  // Single axis (weld count): signed welds sit inside the total-weld track.
+  const maxY = maxOf(visible.map((d) => d.total))
   const groupW = chartW / visible.length
+  const barW = Math.min(0.17, groupW * 0.56)
   addLine(slide, chartX, chartY + chartH, chartX + chartW, chartY + chartH, 'D8DEE7', 0.7)
-  addLine(slide, chartX, chartY + chartH - chartH * 0.1, chartX + chartW, chartY + chartH - chartH * 0.1, C.amber, 0.8, 'dash')
   visible.forEach((point, index) => {
-    const bx = chartX + index * groupW + groupW * 0.16
-    const signedH = (point.signed / maxY) * (chartH * 0.82)
-    const totalH = (point.total / maxY) * (chartH * 0.82)
-    slide.addShape('roundRect', { x: bx, y: chartY + chartH - signedH, w: groupW * 0.24, h: signedH, rectRadius: 0.02, fill: { color: C.mint }, line: { color: C.mint } })
-    slide.addShape('roundRect', { x: bx + groupW * 0.29, y: chartY + chartH - totalH, w: groupW * 0.24, h: totalH, rectRadius: 0.02, fill: { color: C.cyan }, line: { color: C.cyan } })
+    const bx = chartX + index * groupW + (groupW - barW) / 2
+    const totalH = (point.total / maxY) * (chartH * 0.9)
+    const signedH = (point.signed / maxY) * (chartH * 0.9)
+    slide.addShape('roundRect', { x: bx, y: chartY + chartH - totalH, w: barW, h: totalH, rectRadius: 0.02, fill: { color: C.track }, line: { color: C.track } })
+    slide.addShape('roundRect', { x: bx, y: chartY + chartH - signedH, w: barW, h: signedH, rectRadius: 0.02, fill: { color: C.mint }, line: { color: C.mint } })
     if (point.issuesCreated > 0) {
-      slide.addShape('ellipse', { x: bx + groupW * 0.13, y: chartY + chartH - totalH - 0.12, w: 0.08, h: 0.08, fill: { color: C.coral }, line: { color: C.coral } })
+      slide.addShape('ellipse', { x: bx + barW + 0.01, y: chartY + chartH - totalH - 0.02, w: 0.07, h: 0.07, fill: { color: C.coral }, line: { color: C.coral } })
     }
-    if (index > 0) {
-      const prev = visible[index - 1]
-      addLine(
-        slide,
-        chartX + (index - 0.5) * groupW,
-        chartY + chartH - (prev.signoffRate / 100) * chartH,
-        chartX + (index + 0.5) * groupW,
-        chartY + chartH - (point.signoffRate / 100) * chartH,
-        C.amber,
-        1.2,
-      )
+    if (index === visible.length - 1) {
+      slide.addText(percent(point.signoffRate, 0), { x: bx - 0.12, y: chartY + chartH - totalH - 0.17, w: barW + 0.36, h: 0.12, fontSize: 6, bold: true, color: C.accentStrong, align: 'center', margin: 0 })
     }
     if (index % 4 === 0 || index === visible.length - 1) {
-      slide.addText(point.workWeek.replace('WW', ''), { x: chartX + index * groupW, y: chartY + chartH + 0.08, w: 0.35, h: 0.1, fontSize: 5, color: C.muted, rotate: 315, margin: 0 })
+      slide.addText(point.workWeek.replace('WW', ''), { x: chartX + index * groupW - 0.05, y: chartY + chartH + 0.08, w: 0.44, h: 0.1, fontSize: 5, color: C.muted, align: 'center', margin: 0 })
     }
   })
-  slide.addText('10% Baseline', { x: chartX + chartW - 0.85, y: chartY + chartH - chartH * 0.1 - 0.11, w: 0.7, h: 0.1, fontSize: 5.5, color: C.amber, margin: 0 })
+  slide.addText('Signed   Total welds   Issue created', { x: x + 0.4, y: y + 0.32, w: 3.2, h: 0.11, fontSize: 6, color: C.muted, margin: 0 })
   slide.addText('Weld Count', { x: x + 0.15, y: y + 1.18, w: 0.15, h: 1, rotate: 270, fontSize: 5.5, color: C.muted, margin: 0 })
-  slide.addText('Sign-off %', { x: x + w - 0.24, y: y + 1.18, w: 0.15, h: 1, rotate: 90, fontSize: 5.5, color: C.muted, margin: 0 })
 }
 
 function addIssueTable(slide: pptxgen.Slide, report: ReportModel): void {
@@ -395,11 +394,11 @@ function addIssueTable(slide: pptxgen.Slide, report: ReportModel): void {
   ] as const
   let cursor = x
   slide.addShape('roundRect', { x, y: y - 0.05, w: 12.25, h: 4.9, rectRadius: 0.1, fill: { color: C.white }, line: { color: C.faint } })
+  slide.addShape('roundRect', { x, y, w: 12.25, h: 0.3, rectRadius: 0.06, fill: { color: C.panel }, line: { color: C.faint } })
   columns.forEach(([label, width]) => {
-    slide.addText(label, { x: cursor + 0.05, y: y + 0.04, w: width - 0.1, h: 0.12, fontSize: 5.8, bold: true, color: C.white, margin: 0, fit: 'shrink' })
+    slide.addText(label.toUpperCase(), { x: cursor + 0.05, y: y + 0.04, w: width - 0.1, h: 0.12, fontSize: 5.6, bold: true, color: C.muted, charSpacing: 0.4, margin: 0, fit: 'shrink' })
     cursor += width
   })
-  slide.addShape('roundRect', { x, y, w: 12.25, h: 0.3, rectRadius: 0.06, fill: { color: C.graphite }, line: { color: C.graphite } })
   const rows = report.issueTable.slice(0, 16)
   rows.forEach((row, rowIndex) => {
     const yy = y + 0.35 + rowIndex * 0.27

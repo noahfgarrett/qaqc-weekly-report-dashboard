@@ -61,6 +61,7 @@ export interface KpiMetric {
   deltaLabel: string
   tone: 'neutral' | 'good' | 'warn' | 'bad'
   icon: LucideIcon
+  spark?: number[]
 }
 
 export interface WeeklyIssuePoint {

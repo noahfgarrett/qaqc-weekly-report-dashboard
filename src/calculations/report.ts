@@ -266,6 +266,7 @@ function makeMetric(
   icon: KpiMetric['icon'],
   tone: KpiMetric['tone'] = 'neutral',
   formatter: (value: number) => string = compactNumber,
+  spark?: number[],
 ): KpiMetric {
   const delta = rawValue - previous
   return {
@@ -277,6 +278,7 @@ function makeMetric(
     deltaLabel: deltaLabel(delta),
     tone,
     icon,
+    spark: spark && spark.length > 1 ? spark : undefined,
   }
 }
 
@@ -325,10 +327,11 @@ function buildMonthlyTrend(issues: IssueRecord[], cutoff: Date): MonthlyIssuePoi
 }
 
 function buildAging(issues: IssueRecord[], today: Date): AgingBucket[] {
+  // Blue ordinal ramp (fresh -> old = light -> dark), validated via dataviz --ordinal.
   const buckets: AgingBucket[] = [
-    { label: '0-14 Days', count: 0, color: '#14b8a6' },
-    { label: '14-28 Days', count: 0, color: '#f59e0b' },
-    { label: '28+ Days', count: 0, color: '#f05252' },
+    { label: '0-14 Days', count: 0, color: '#86B6EF' },
+    { label: '14-28 Days', count: 0, color: '#256ABF' },
+    { label: '28+ Days', count: 0, color: '#184F95' },
   ]
   issues
     .filter((issue) => issue.statusKind !== 'void' && issue.createdOn)
@@ -479,15 +482,27 @@ export function buildReportModel(
   const closureRate = totalOpened ? (totalClosed / totalOpened) * 100 : 0
   const previousClosureRate = previousTotalOpened ? (previousTotalClosed / previousTotalOpened) * 100 : 0
 
+  // Per-week history for KPI sparklines (last SPARK_WEEKS reporting weeks).
+  const SPARK_WEEKS = 12
+  const sparkWeeks = enumerateWorkWeeks(START_WEEK, reportWeek).slice(-SPARK_WEEKS)
+  const openedWeekSeries = sparkWeeks.map((week) => countOpenedIn(issues, week))
+  const closedWeekSeries = sparkWeeks.map((week) => countClosedIn(issues, week))
+  const cumOpenedSeries = sparkWeeks.map((week) => countOpenedThrough(issues, week))
+  const cumClosedSeries = sparkWeeks.map((week) => countClosedThrough(issues, week))
+  const remainingSeries = cumOpenedSeries.map((opened, i) => opened - cumClosedSeries[i])
+  const closureRateSeries = cumOpenedSeries.map((opened, i) => (opened ? (cumClosedSeries[i] / opened) * 100 : 0))
+  const inspectionsSeries = sparkWeeks.map((week) => inspections.filter((row) => row.workWeek?.label === week.label && phaseEquals(row.phase, 'Final')).length)
+  const sorsSeries = sparkWeeks.map((week) => inspections.filter((row) => row.workWeek?.label === week.label && includesPhase(row.phase, 'SOR')).length)
+
   const kpis: KpiMetric[] = [
-    makeMetric('total-opened', 'Total Issues Opened', totalOpened, previousTotalOpened, ClipboardList),
-    makeMetric('total-closed', 'Total Issues Closed', totalClosed, previousTotalClosed, CheckCircle2, 'good'),
-    makeMetric('opened-week', 'Opened This Week', openedWeek, openedPreviousWeek, TrendingUp, openedWeek > openedPreviousWeek ? 'warn' : 'neutral'),
-    makeMetric('closed-week', 'Closed This Week', closedWeek, closedPreviousWeek, TrendingDown, closedWeek >= closedPreviousWeek ? 'good' : 'neutral'),
-    makeMetric('remaining-open', 'Remaining Open', remaining, previousRemaining, AlertCircle, remaining > previousRemaining ? 'warn' : 'good'),
-    makeMetric('inspections', 'Inspections', inspectionsWeek, inspectionsPrevious, ClipboardCheck, 'good'),
-    makeMetric('sors', 'SORs', sorsWeek, sorsPrevious, Wrench, sorsWeek > sorsPrevious ? 'warn' : 'neutral'),
-    makeMetric('closure-rate', 'Closure Rate', closureRate, previousClosureRate, Gauge, 'good', (value) => percent(value, 1)),
+    makeMetric('total-opened', 'Total Issues Opened', totalOpened, previousTotalOpened, ClipboardList, 'neutral', compactNumber, cumOpenedSeries),
+    makeMetric('total-closed', 'Total Issues Closed', totalClosed, previousTotalClosed, CheckCircle2, 'good', compactNumber, cumClosedSeries),
+    makeMetric('opened-week', 'Opened This Week', openedWeek, openedPreviousWeek, TrendingUp, openedWeek > openedPreviousWeek ? 'warn' : 'neutral', compactNumber, openedWeekSeries),
+    makeMetric('closed-week', 'Closed This Week', closedWeek, closedPreviousWeek, TrendingDown, closedWeek >= closedPreviousWeek ? 'good' : 'neutral', compactNumber, closedWeekSeries),
+    makeMetric('remaining-open', 'Remaining Open', remaining, previousRemaining, AlertCircle, remaining > previousRemaining ? 'warn' : 'good', compactNumber, remainingSeries),
+    makeMetric('inspections', 'Inspections', inspectionsWeek, inspectionsPrevious, ClipboardCheck, 'good', compactNumber, inspectionsSeries),
+    makeMetric('sors', 'SORs', sorsWeek, sorsPrevious, Wrench, sorsWeek > sorsPrevious ? 'warn' : 'neutral', compactNumber, sorsSeries),
+    makeMetric('closure-rate', 'Closure Rate', closureRate, previousClosureRate, Gauge, 'good', (value) => percent(value, 1), closureRateSeries),
   ]
 
   const electrical = buildElectrical(electricalRecords, reportWeek)

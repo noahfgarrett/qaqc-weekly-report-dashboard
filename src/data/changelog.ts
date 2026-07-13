@@ -7,6 +7,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.0.6',
+    date: '2026-07-13T12:58:54Z',
+    type: 'major',
+    notes: [
+      'The dashboard and exported deck share a new refined, professional design built around a single slate-blue accent, with red, amber, and green reserved for status',
+      'KPI metrics are now grouped into project-to-date and current-week clusters, led by a Remaining Open headline with real multi-week trend sparklines',
+      'Every chart was rebuilt for clarity: consistent color meaning for opened, closed, and remaining issues, clean integer axes, and colorblind-safe palettes',
+      'The welding chart now shows sign-off rate on a single axis, reading signed welds within the total-weld track instead of a second scale',
+      'Exported PPTX and PDF decks match the new visual language for a consistent hand-off to the General Contractor',
+    ],
+  },
+  {
     version: '1.0.5',
     date: '2026-07-13T11:19:48Z',
     type: 'feature',

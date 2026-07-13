@@ -219,25 +219,91 @@ function UpdateModal({
   )
 }
 
-function KpiCard({ metric }: { metric: KpiMetric }) {
-  const Icon = metric.icon
+function Sparkline({ data, hero }: { data: number[]; hero?: boolean }) {
+  const w = 100
+  const h = hero ? 34 : 22
+  const pad = 3
+  const min = Math.min(...data)
+  const max = Math.max(...data)
+  const span = max - min || 1
+  const step = (w - pad * 2) / Math.max(1, data.length - 1)
+  const points = data.map((value, index) => ({
+    x: pad + index * step,
+    y: pad + (h - pad * 2) * (1 - (value - min) / span),
+  }))
+  const line = points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x.toFixed(1)} ${point.y.toFixed(1)}`).join(' ')
+  const last = points[points.length - 1]
+  const area = `${line} L ${last.x.toFixed(1)} ${h - pad} L ${points[0].x.toFixed(1)} ${h - pad} Z`
   return (
-    <article className={cx('kpi-card', `tone-${metric.tone}`)}>
-      <div className="kpi-topline">
+    <svg className="kpi-spark" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" aria-hidden="true">
+      <path className="spark-area" d={area} />
+      <path className="spark-line" d={line} vectorEffect="non-scaling-stroke" />
+      <circle className="spark-dot" cx={last.x} cy={last.y} r={hero ? 2.4 : 2} />
+    </svg>
+  )
+}
+
+function KpiTile({ metric, hero }: { metric: KpiMetric; hero?: boolean }) {
+  const Icon = metric.icon
+  const toneClass = metric.tone === 'good' ? 'good' : metric.tone === 'warn' ? 'warn' : metric.tone === 'bad' ? 'bad' : ''
+  const arrow = metric.delta > 0.0001 ? '▲' : metric.delta < -0.0001 ? '▼' : ''
+  const deltaText = metric.deltaLabel.replace(' vs PW', '')
+  return (
+    <article className={cx('kpi-tile', hero && 'hero')}>
+      <div className="kpi-tile-head">
         <span className="kpi-icon">
-          <Icon size={17} />
+          <Icon size={hero ? 15 : 13} />
         </span>
-        <span className="kpi-delta">{metric.deltaLabel}</span>
+        <span className="kpi-label">{metric.label}</span>
       </div>
-      <strong>{metric.value}</strong>
-      <span>{metric.label}</span>
-      <div className="sparkline" aria-hidden="true">
-        <i />
-        <i />
-        <i />
-        <i />
+      <div className="kpi-value-row">
+        <strong>{metric.value}</strong>
+        <span className={cx('kpi-delta', toneClass)}>
+          {arrow && <span aria-hidden="true">{arrow}</span>}
+          {deltaText}
+        </span>
       </div>
+      {metric.spark && <Sparkline data={metric.spark} hero={hero} />}
     </article>
+  )
+}
+
+const KPI_GROUPS = {
+  primary: { hero: 'remaining-open', rest: ['total-opened', 'total-closed', 'closure-rate'] },
+  week: ['opened-week', 'closed-week', 'inspections', 'sors'],
+} as const
+
+function KpiZone({ report }: { report: ReturnType<typeof buildReportModel> }) {
+  const byId = new Map(report.kpis.map((metric) => [metric.id, metric]))
+  const hero = byId.get(KPI_GROUPS.primary.hero)
+  return (
+    <div className="kpi-groups">
+      <section className="kpi-group primary">
+        <div className="kpi-group-head">
+          <span>Project to date</span>
+          <em>Through {report.reportWeek.label}</em>
+        </div>
+        <div className="kpi-group-body">
+          {hero && <KpiTile metric={hero} hero />}
+          {KPI_GROUPS.primary.rest.map((id) => {
+            const metric = byId.get(id)
+            return metric ? <KpiTile key={id} metric={metric} /> : null
+          })}
+        </div>
+      </section>
+      <section className="kpi-group this-week">
+        <div className="kpi-group-head">
+          <span>This week</span>
+          <em>{report.reportWeek.label}</em>
+        </div>
+        <div className="kpi-group-body">
+          {KPI_GROUPS.week.map((id) => {
+            const metric = byId.get(id)
+            return metric ? <KpiTile key={id} metric={metric} /> : null
+          })}
+        </div>
+      </section>
+    </div>
   )
 }
 
@@ -257,20 +323,22 @@ function FilterMenu({
   disabled?: boolean
 }) {
   const [open, setOpen] = useState(false)
+  const active = !disabled && selected.length > 0
   const display = disabled
     ? 'OAC range'
     : selected.length === 0
       ? 'All'
       : selected.length === 1
         ? selected[0]
-        : `${selected.length} selected`
+        : 'Multiple'
 
   return (
     <div className="filter-menu">
-      <button className="filter-button" type="button" onClick={() => setOpen((value) => !value)} disabled={disabled}>
+      <button className={cx('filter-button', active && 'active')} type="button" onClick={() => setOpen((value) => !value)} disabled={disabled}>
         {icon}
         <span>{label}</span>
         <strong>{display}</strong>
+        {selected.length > 1 && !disabled && <span className="count-badge">{selected.length}</span>}
         <ChevronDown size={14} />
       </button>
       {open && !disabled && (
@@ -305,16 +373,17 @@ type PlotPoint = {
   y: number
 }
 
-function niceMax(value: number, steps = 4): number {
-  if (value <= steps) return steps
-  const magnitude = 10 ** Math.floor(Math.log10(value))
-  const normalized = value / magnitude
-  const step = normalized <= 2 ? magnitude / 2 : normalized <= 5 ? magnitude : magnitude * 2
-  return Math.ceil(value / step) * step
-}
-
-function chartTicks(max: number, steps = 4): number[] {
-  return Array.from({ length: steps + 1 }, (_, index) => max - (max / steps) * index)
+// Round to a "nice" axis with clean integer-friendly ticks (never 37.5-style labels).
+function niceScale(rawMax: number, targetSteps = 4): { max: number; ticks: number[] } {
+  const safe = Math.max(rawMax, 1)
+  const rough = safe / targetSteps
+  const magnitude = 10 ** Math.floor(Math.log10(rough))
+  const normalized = rough / magnitude
+  const step = (normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 2.5 ? 2.5 : normalized <= 5 ? 5 : 10) * magnitude
+  const max = Math.ceil(safe / step) * step
+  const ticks: number[] = []
+  for (let value = max; value >= -1e-9; value -= step) ticks.push(Math.round(value * 1000) / 1000)
+  return { max, ticks }
 }
 
 function smoothPath(points: PlotPoint[]): string {
@@ -361,10 +430,10 @@ function ChartTooltip({
 function RangeChart({ data }: { data: WeeklyIssuePoint[] }) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
   const visible = data.slice(-30)
-  const max = niceMax(Math.max(1, ...visible.flatMap((point) => [point.opened, point.closed, point.remainingOpen])))
+  const { max, ticks } = niceScale(Math.max(1, ...visible.flatMap((point) => [point.opened, point.closed, point.remainingOpen])))
   const width = 980
-  const height = 370
-  const pad = { l: 62, r: 28, t: 24, b: 102 }
+  const height = 360
+  const pad = { l: 46, r: 22, t: 20, b: 44 }
   const chartW = width - pad.l - pad.r
   const chartH = height - pad.t - pad.b
   const group = chartW / Math.max(visible.length, 1)
@@ -390,11 +459,11 @@ function RangeChart({ data }: { data: WeeklyIssuePoint[] }) {
       <svg viewBox={`0 0 ${width} ${height}`} className="chart-svg" role="img" aria-label="Issues by Work Week">
         <defs>
           <linearGradient id="remaining-area" x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.2" />
-            <stop offset="100%" stopColor="#f59e0b" stopOpacity="0" />
+            <stop offset="0%" stopColor="#c2870b" stopOpacity="0.16" />
+            <stop offset="100%" stopColor="#c2870b" stopOpacity="0" />
           </linearGradient>
         </defs>
-        {chartTicks(max).map((tick) => (
+        {ticks.map((tick) => (
           <g key={tick}>
             <line
             x1={pad.l}
@@ -416,12 +485,12 @@ function RangeChart({ data }: { data: WeeklyIssuePoint[] }) {
             <g key={point.workWeek} onMouseEnter={() => setHoveredIndex(index)} onMouseLeave={() => setHoveredIndex(null)}>
               {isLatest && <rect className="report-week-band" x={pad.l + index * group} y={pad.t} width={group} height={chartH} rx="8" />}
               <rect className="chart-hit-area" x={pad.l + index * group} y={pad.t} width={group} height={chartH} />
-              <rect className="bar opened" x={baseX} y={pad.t + chartH - openedH} width={group * 0.23} height={openedH} rx="5" />
-              <rect className="bar closed" x={baseX + group * 0.31} y={pad.t + chartH - closedH} width={group * 0.23} height={closedH} rx="5" />
-              {(isActive || isLatest) && point.opened > 0 && <text className="bar-value" x={baseX + group * 0.115} y={toY(point.opened) - 7} textAnchor="middle">{point.opened}</text>}
-              {(isActive || isLatest) && point.closed > 0 && <text className="bar-value" x={baseX + group * 0.425} y={toY(point.closed) - 7} textAnchor="middle">{point.closed}</text>}
-              {(index % 3 === 0 || index === visible.length - 1) && (
-              <text x={pad.l + index * group + group / 2} y={height - 54} textAnchor="end" transform={`rotate(-45 ${pad.l + index * group + group / 2} ${height - 54})`}>
+              <rect className="bar opened" x={baseX} y={pad.t + chartH - openedH} width={group * 0.22} height={openedH} rx="3" />
+              <rect className="bar closed" x={baseX + group * 0.32} y={pad.t + chartH - closedH} width={group * 0.22} height={closedH} rx="3" />
+              {(isActive || isLatest) && point.opened > 0 && <text className="bar-value" x={baseX + group * 0.11} y={toY(point.opened) - 6} textAnchor="middle">{point.opened}</text>}
+              {(isActive || isLatest) && point.closed > 0 && <text className="bar-value" x={baseX + group * 0.43} y={toY(point.closed) - 6} textAnchor="middle">{point.closed}</text>}
+              {(index % 5 === 0 || index === visible.length - 1) && (
+                <text x={pad.l + index * group + group / 2} y={height - 24} textAnchor="middle">
                   {point.workWeek.replace('WW', '')}
                 </text>
               )}
@@ -438,8 +507,6 @@ function RangeChart({ data }: { data: WeeklyIssuePoint[] }) {
             {`Open ${points[points.length - 1].point.remainingOpen}`}
           </text>
         )}
-        <text x={width / 2} y={height - 18} className="axis-title" textAnchor="middle">Work Week</text>
-        <text x="17" y={pad.t + chartH / 2} transform={`rotate(-90 17 ${pad.t + chartH / 2})`} className="axis-title" textAnchor="middle">Issue Count</text>
       </svg>
       {hovered && hoveredPoint && (
         <ChartTooltip
@@ -455,7 +522,7 @@ function RangeChart({ data }: { data: WeeklyIssuePoint[] }) {
 function MonthlyChart({ data }: { data: MonthlyIssuePoint[] }) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
   const visible = data.slice(-8)
-  const max = niceMax(Math.max(1, ...visible.flatMap((point) => [point.opened, point.closed])))
+  const { max, ticks } = niceScale(Math.max(1, ...visible.flatMap((point) => [point.opened, point.closed])))
   const width = 460
   const height = 230
   const pad = { l: 48, r: 22, t: 18, b: 42 }
@@ -480,11 +547,11 @@ function MonthlyChart({ data }: { data: MonthlyIssuePoint[] }) {
       <svg className="mini-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Cumulative Opened vs Closed">
         <defs>
           <linearGradient id="monthly-gap" x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.18" />
-            <stop offset="100%" stopColor="#14b8a6" stopOpacity="0.04" />
+            <stop offset="0%" stopColor="#2e5aac" stopOpacity="0.12" />
+            <stop offset="100%" stopColor="#2e5aac" stopOpacity="0.02" />
           </linearGradient>
         </defs>
-        {chartTicks(max).map((tick) => (
+        {ticks.map((tick) => (
           <g key={tick}>
             <line x1={pad.l} x2={width - pad.r} y1={toY(tick)} y2={toY(tick)} className="grid-line" />
             <text className="tick-label" x={pad.l - 8} y={toY(tick) + 4} textAnchor="end">{chartValue(tick)}</text>
@@ -526,10 +593,6 @@ function AgingChart({ data }: { data: AgingBucket[] }) {
   const total = data.reduce((sum, bucket) => sum + bucket.count, 0)
   return (
     <div className="aging-chart">
-      <div className="aging-summary">
-        <strong>{compactNumber(total)}</strong>
-        <span>Issues measured by age</span>
-      </div>
       <div className="aging-stack" aria-label="Issue aging distribution">
         {data.map((bucket) => (
           <i
@@ -555,10 +618,10 @@ function AgingChart({ data }: { data: AgingBucket[] }) {
 function ElectricalChart({ data }: { data: ElectricalPoint[] }) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
   const visible = data.slice(-24)
-  const max = niceMax(Math.max(1, ...visible.map((point) => point.finals)))
+  const { max, ticks } = niceScale(Math.max(1, ...visible.map((point) => point.finals)))
   const width = 620
-  const height = 390
-  const pad = { l: 54, r: 28, t: 24, b: 110 }
+  const height = 360
+  const pad = { l: 44, r: 22, t: 20, b: 42 }
   const chartW = width - pad.l - pad.r
   const chartH = height - pad.t - pad.b
   const step = chartW / Math.max(1, visible.length - 1)
@@ -570,11 +633,11 @@ function ElectricalChart({ data }: { data: ElectricalPoint[] }) {
       <svg className="chart-svg" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Electrical Inspections by Work Week">
         <defs>
           <linearGradient id="electrical-area" x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0%" stopColor="#14b8a6" stopOpacity="0.26" />
-            <stop offset="100%" stopColor="#14b8a6" stopOpacity="0" />
+            <stop offset="0%" stopColor="#2e5aac" stopOpacity="0.16" />
+            <stop offset="100%" stopColor="#2e5aac" stopOpacity="0" />
           </linearGradient>
         </defs>
-        {chartTicks(max).map((tick) => (
+        {ticks.map((tick) => (
           <g key={tick}>
             <line x1={pad.l} x2={width - pad.r} y1={toY(tick)} y2={toY(tick)} className="grid-line" />
             <text className="tick-label" x={pad.l - 9} y={toY(tick) + 4} textAnchor="end">{chartValue(tick)}</text>
@@ -598,15 +661,13 @@ function ElectricalChart({ data }: { data: ElectricalPoint[] }) {
               )}
               {isLatest && <text className="series-end-label electrical-label" x={x - 7} y={Math.max(pad.t + 12, y - 10)} textAnchor="end">{point.finals}</text>}
               {(index % 4 === 0 || isLatest) && (
-                <text x={x} y={height - 62} textAnchor="end" transform={`rotate(-45 ${x} ${height - 62})`}>
+                <text x={x} y={height - 22} textAnchor="middle">
                   {point.workWeek.replace('WW', '')}
                 </text>
               )}
             </g>
           )
         })}
-        <text x="17" y={pad.t + chartH / 2} transform={`rotate(-90 17 ${pad.t + chartH / 2})`} className="axis-title" textAnchor="middle">Final Inspections</text>
-        <text x={width / 2} y={height - 18} className="axis-title" textAnchor="middle">Work Week Observed</text>
       </svg>
       {hovered && (
         <ChartTooltip
@@ -622,65 +683,55 @@ function ElectricalChart({ data }: { data: ElectricalPoint[] }) {
 function WeldingChart({ data }: { data: WeldingPoint[] }) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
   const visible = data.slice(-24)
-  const max = niceMax(Math.max(1, ...visible.flatMap((point) => [point.signed, point.total])))
+  // Single axis = weld count. Signed welds sit inside the total-weld track, so the
+  // fill proportion reads as the sign-off rate without a second y-scale.
+  const { max, ticks } = niceScale(Math.max(1, ...visible.map((point) => point.total)))
   const width = 620
-  const height = 390
-  const pad = { l: 54, r: 54, t: 24, b: 110 }
+  const height = 360
+  const pad = { l: 44, r: 22, t: 20, b: 42 }
   const chartW = width - pad.l - pad.r
   const chartH = height - pad.t - pad.b
   const group = chartW / Math.max(visible.length, 1)
+  const barW = Math.min(24, group * 0.56)
   const toY = (value: number) => pad.t + chartH - (value / max) * chartH
-  const toPercentY = (value: number) => pad.t + chartH - (value / 100) * chartH
-  const linePoints = visible.map((point, index) => ({
-    x: pad.l + index * group + group / 2,
-    y: toPercentY(point.signoffRate),
-  }))
   const hovered = hoveredIndex === null ? null : visible[hoveredIndex]
   return (
     <div className="chart-shell field-chart-shell">
       <svg className="chart-svg" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Welding Signoffs by Work Week">
-        {chartTicks(max).map((tick) => (
+        {ticks.map((tick) => (
           <g key={tick}>
             <line x1={pad.l} x2={width - pad.r} y1={toY(tick)} y2={toY(tick)} className="grid-line" />
             <text className="tick-label" x={pad.l - 9} y={toY(tick) + 4} textAnchor="end">{chartValue(tick)}</text>
           </g>
         ))}
-        {[0, 25, 50, 75, 100].map((tick) => <text key={tick} className="percent-tick" x={width - pad.r + 9} y={toPercentY(tick) + 4}>{tick}%</text>)}
-        <line x1={pad.l} x2={width - pad.r} y1={toPercentY(10)} y2={toPercentY(10)} className="baseline" />
-        <text x={width - pad.r - 4} y={toPercentY(10) - 7} className="baseline-label" textAnchor="end">10% target</text>
         {visible.map((point, index) => {
-          const x = pad.l + index * group + group * 0.14
-          const signedH = (point.signed / max) * chartH
+          const x = pad.l + index * group + (group - barW) / 2
           const totalH = (point.total / max) * chartH
+          const signedH = (point.signed / max) * chartH
           const isLatest = index === visible.length - 1
           const isActive = index === hoveredIndex
           return (
             <g key={point.workWeek} onMouseEnter={() => setHoveredIndex(index)} onMouseLeave={() => setHoveredIndex(null)}>
               <rect className="chart-hit-area" x={pad.l + index * group} y={pad.t} width={group} height={chartH} />
-              <rect className="bar closed" x={x} y={pad.t + chartH - signedH} width={group * 0.29} height={signedH} rx="5" />
-              <rect className="bar opened" x={x + group * 0.35} y={pad.t + chartH - totalH} width={group * 0.29} height={totalH} rx="5" />
-              {(isActive || isLatest) && point.signed > 0 && <text className="bar-value" x={x + group * 0.145} y={toY(point.signed) - 7} textAnchor="middle">{point.signed}</text>}
-              {(isActive || isLatest) && point.total > 0 && <text className="bar-value" x={x + group * 0.495} y={toY(point.total) - 7} textAnchor="middle">{point.total}</text>}
+              <rect className="bar track" x={x} y={pad.t + chartH - totalH} width={barW} height={totalH} rx="3" />
+              <rect className="bar closed" x={x} y={pad.t + chartH - signedH} width={barW} height={signedH} rx="3" />
               {point.issuesCreated > 0 && (
-                <g className="issue-badge" transform={`translate(${x + group * 0.49} ${Math.max(pad.t + 12, toY(point.total) - 16)})`}>
-                  <circle r="8" />
+                <g className="issue-badge" transform={`translate(${x + barW + 3} ${Math.max(pad.t + 10, toY(point.total) - 4)})`}>
+                  <circle r="7" />
                   <text textAnchor="middle" y="3">{point.issuesCreated}</text>
                 </g>
               )}
+              {(isActive || isLatest) && (
+                <text className="series-end-label signoff-label" x={x + barW / 2} y={toY(point.total) - 8} textAnchor="middle">{percent(point.signoffRate, 0)}</text>
+              )}
               {(index % 4 === 0 || isLatest) && (
-                <text x={pad.l + index * group + group / 2} y={height - 62} textAnchor="end" transform={`rotate(-45 ${pad.l + index * group + group / 2} ${height - 62})`}>
+                <text x={pad.l + index * group + group / 2} y={height - 22} textAnchor="middle">
                   {point.workWeek.replace('WW', '')}
                 </text>
               )}
             </g>
           )
         })}
-        <path d={smoothPath(linePoints)} className="signoff-line" fill="none" />
-        {linePoints.map((point, index) => <circle key={`signoff-${visible[index].workWeek}`} cx={point.x} cy={point.y} r={index === hoveredIndex ? 4.5 : 2.7} className="signoff-dot" />)}
-        {visible.length > 0 && <text className="series-end-label signoff-label" x={linePoints[linePoints.length - 1].x - 7} y={Math.max(pad.t + 13, linePoints[linePoints.length - 1].y - 10)} textAnchor="end">{percent(visible[visible.length - 1].signoffRate, 0)}</text>}
-        <text x="17" y={pad.t + chartH / 2} transform={`rotate(-90 17 ${pad.t + chartH / 2})`} className="axis-title" textAnchor="middle">Weld Count</text>
-        <text x={width - 17} y={pad.t + chartH / 2} transform={`rotate(90 ${width - 17} ${pad.t + chartH / 2})`} className="axis-title" textAnchor="middle">Sign-off %</text>
-        <text x={width / 2} y={height - 18} className="axis-title" textAnchor="middle">Weld Work Week</text>
       </svg>
       {hovered && (
         <ChartTooltip
@@ -729,11 +780,7 @@ function OverviewSlide({ report, exportable }: { report: ReturnType<typeof build
         <span>{report.source === 'files' ? 'Imported Files' : 'Preview Layout'}</span>
         <span>Report Week {report.reportWeek.label}</span>
       </div>
-      <div className="kpi-grid">
-        {report.kpis.map((metric) => (
-          <KpiCard key={metric.id} metric={metric} />
-        ))}
-      </div>
+      <KpiZone report={report} />
       <div className="overview-grid">
         <article className="panel chart-panel wide">
           <div className="panel-title">
@@ -846,10 +893,9 @@ function FieldSlide({ report, exportable }: { report: ReturnType<typeof buildRep
             <h3>Welding Signoffs by Work Week</h3>
           </div>
           <div className="chart-legend">
-            <span className="legend-closed">Signed Welds</span>
-            <span className="legend-opened">Total Welds</span>
-            <span className="legend-amber">Sign-off %</span>
-            <span className="legend-issue">Issue Created</span>
+            <span className="legend-closed">Signed</span>
+            <span className="legend-track">Total welds</span>
+            <span className="legend-issue">Issue created</span>
           </div>
           <WeldingChart data={report.welding} />
         </article>
