@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Activity,
   AlertCircle,
+  Archive,
   Bell,
   Bolt,
   CalendarClock,
@@ -9,9 +10,9 @@ import {
   ChevronDown,
   ClipboardCheck,
   Download,
-  FileUp,
   FileSpreadsheet,
   Filter,
+  FolderOpen,
   Gauge,
   GitBranch,
   LineChart,
@@ -22,7 +23,6 @@ import {
   SlidersHorizontal,
   Table2,
   Trash2,
-  Upload,
   Wrench,
   X,
 } from 'lucide-react'
@@ -31,7 +31,7 @@ import { buildSampleBundle } from '@/data/sampleData'
 import { CHANGELOG } from '@/data/changelog'
 import { exportReportDeck } from '@/export/pptx'
 import { exportSlidesPdf } from '@/export/pdf'
-import { importSpreadsheet } from '@/services/fileImport'
+import { expandImportFiles, filesFromDrop, importSpreadsheet } from '@/services/fileImport'
 import { clearLegacyConnectionData, loadFilters, saveFilters } from '@/services/storage'
 import { checkForUpdate, downloadUpdate } from '@/services/updateChecker'
 import type {
@@ -861,13 +861,15 @@ function FieldSlide({ report, exportable }: { report: ReturnType<typeof buildRep
 function ConnectFirst({
   imports,
   onChoose,
-  onFiles,
+  onChooseFolder,
+  onDrop,
   onPreview,
   importing,
 }: {
   imports: Partial<Record<SheetRole, ImportedSheetFile>>
   onChoose: () => void
-  onFiles: (files: File[]) => void
+  onChooseFolder: () => void
+  onDrop: (dataTransfer: DataTransfer) => void
   onPreview: () => void
   importing: boolean
 }) {
@@ -888,18 +890,22 @@ function ConnectFirst({
       onDrop={(event) => {
         event.preventDefault()
         setDragging(false)
-        onFiles(Array.from(event.dataTransfer.files))
+        onDrop(event.dataTransfer)
       }}
     >
       <div className="connect-first-mark">
-        <FileUp size={34} />
+        <Archive size={34} />
       </div>
-      <h2>Drop weekly Smartsheet exports</h2>
+      <h2>Drop a ZIP, folder, or weekly exports</h2>
       <p>{importCount}/4 required files ready</p>
       <div className="connect-first-actions">
         <button className="button primary" type="button" onClick={onChoose} disabled={importing}>
-          {importing ? <RefreshCw size={16} className="spin" /> : <Upload size={16} />}
-          Choose Files
+          {importing ? <RefreshCw size={16} className="spin" /> : <Archive size={16} />}
+          Choose ZIP or Files
+        </button>
+        <button className="button secondary" type="button" onClick={onChooseFolder} disabled={importing}>
+          <FolderOpen size={16} />
+          Choose Folder
         </button>
         <button className="button secondary" type="button" onClick={onPreview} disabled={importing}>
           <LineChart size={16} />
@@ -917,7 +923,7 @@ function ConnectFirst({
           )
         })}
       </div>
-      <small>.xls, .xlsx, and .csv</small>
+      <small>.zip, .xls, .xlsx, .csv, or a full folder</small>
     </section>
   )
 }
@@ -925,12 +931,14 @@ function ConnectFirst({
 function ImportPanel({
   imports,
   onChoose,
+  onChooseFolder,
   onRemove,
   onClear,
   importing,
 }: {
   imports: Partial<Record<SheetRole, ImportedSheetFile>>
   onChoose: () => void
+  onChooseFolder: () => void
   onRemove: (role: SheetRole) => void
   onClear: () => void
   importing: boolean
@@ -946,8 +954,12 @@ function ImportPanel({
         <strong>{importCount}/4</strong>
       </div>
       <button className="button primary import-button" type="button" onClick={onChoose} disabled={importing}>
-        {importing ? <RefreshCw size={16} className="spin" /> : <Upload size={16} />}
-        Import Exports
+        {importing ? <RefreshCw size={16} className="spin" /> : <Archive size={16} />}
+        Import ZIP or Files
+      </button>
+      <button className="button secondary import-button folder-button" type="button" onClick={onChooseFolder} disabled={importing}>
+        <FolderOpen size={16} />
+        Import Folder
       </button>
       <div className="import-role-list">
         {(Object.keys(ROLE_CONFIG) as SheetRole[]).map((role) => {
@@ -1002,6 +1014,7 @@ export default function App() {
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null)
   const [updateOpen, setUpdateOpen] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const folderInputRef = useRef<HTMLInputElement>(null)
   const importCount = Object.keys(imports).length
   const filesReady = importCount === 4
   const hasReport = bundle.source === 'files' || bundle.source === 'demo'
@@ -1045,7 +1058,8 @@ export default function App() {
     setImporting(true)
     setError(null)
     try {
-      const results = await Promise.allSettled(files.map(importSpreadsheet))
+      const expandedFiles = await expandImportFiles(files)
+      const results = await Promise.allSettled(expandedFiles.map(importSpreadsheet))
       const next = { ...imports }
       const errors: string[] = []
       results.forEach((result) => {
@@ -1062,6 +1076,20 @@ export default function App() {
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to import the selected spreadsheets.')
+    } finally {
+      setImporting(false)
+    }
+  }
+
+  async function handleDrop(dataTransfer: DataTransfer): Promise<void> {
+    setImporting(true)
+    setError(null)
+    try {
+      const droppedFiles = await filesFromDrop(dataTransfer)
+      if (droppedFiles.length === 0) throw new Error('The dropped folder did not contain any files.')
+      await handleFiles(droppedFiles)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to read the dropped folder.')
     } finally {
       setImporting(false)
     }
@@ -1094,8 +1122,19 @@ export default function App() {
         ref={fileInputRef}
         className="file-input"
         type="file"
-        accept=".xls,.xlsx,.csv"
+        accept=".zip,.xls,.xlsx,.csv"
         multiple
+        onChange={(event) => {
+          void handleFiles(Array.from(event.target.files ?? []))
+          event.target.value = ''
+        }}
+      />
+      <input
+        ref={folderInputRef}
+        className="file-input"
+        type="file"
+        multiple
+        {...({ webkitdirectory: '' } as React.InputHTMLAttributes<HTMLInputElement>)}
         onChange={(event) => {
           void handleFiles(Array.from(event.target.files ?? []))
           event.target.value = ''
@@ -1142,8 +1181,8 @@ export default function App() {
             </button>
           )}
           <button className="icon-button labeled" type="button" onClick={() => fileInputRef.current?.click()} disabled={importing}>
-            {importing ? <RefreshCw size={16} className="spin" /> : <Upload size={16} />}
-            Import Files
+            {importing ? <RefreshCw size={16} className="spin" /> : <Archive size={16} />}
+            Import ZIP
           </button>
           <button
             className="button primary"
@@ -1242,6 +1281,7 @@ export default function App() {
           <ImportPanel
             imports={imports}
             onChoose={() => fileInputRef.current?.click()}
+            onChooseFolder={() => folderInputRef.current?.click()}
             onRemove={removeImport}
             onClear={clearImports}
             importing={importing}
@@ -1271,7 +1311,8 @@ export default function App() {
               imports={imports}
               importing={importing}
               onChoose={() => fileInputRef.current?.click()}
-              onFiles={(files) => void handleFiles(files)}
+              onChooseFolder={() => folderInputRef.current?.click()}
+              onDrop={(dataTransfer) => void handleDrop(dataTransfer)}
               onPreview={() => {
                 setBundle(PREVIEW_BUNDLE)
                 setActiveSlide('overview')

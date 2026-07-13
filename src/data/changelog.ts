@@ -7,6 +7,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.0.5',
+    date: '2026-07-13T11:19:48Z',
+    type: 'feature',
+    notes: [
+      'A single ZIP containing all weekly Smartsheet exports can now generate the complete report',
+      'Full folders can be selected or dragged into the app with recursive support for nested directories',
+      'ZIP imports ignore unrelated files and macOS metadata while preserving automatic four-log mapping',
+      'Archive size limits prevent unusually large ZIP contents from overwhelming the standalone browser app',
+    ],
+  },
+  {
     version: '1.0.4',
     date: '2026-07-10T13:46:30Z',
     type: 'feature',

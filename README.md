@@ -4,7 +4,7 @@ Standalone HTML dashboard for weekly QA/QC reporting from Smartsheet exports.
 
 ## What It Does
 
-- Imports `.xls`, `.xlsx`, and `.csv` files exported from Smartsheet.
+- Imports a ZIP, full folder, or individual `.xls`, `.xlsx`, and `.csv` files exported from Smartsheet.
 - Auto-maps the four required logs by filename and column headers:
   - BIM Issues Log
   - Mechanical / Process Inspection Log
@@ -18,8 +18,8 @@ Standalone HTML dashboard for weekly QA/QC reporting from Smartsheet exports.
 ## Weekly Workflow
 
 1. Schedule the four Smartsheet logs to be emailed as Excel attachments each Tuesday.
-2. Download the attachments from the company email account.
-3. Open `QAQC-Weekly-Report-Dashboard.html` and drop all four files into the import screen.
+2. Download the combined ZIP or attachments from the company email account.
+3. Open `QAQC-Weekly-Report-Dashboard.html` and drop in the ZIP, its folder, or the four individual files.
 4. Review the report and export the GC-safe PPTX or PDF.
 
 ## Local Development
