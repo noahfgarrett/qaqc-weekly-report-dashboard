@@ -7,6 +7,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.0.7',
+    date: '2026-07-13T19:52:14Z',
+    type: 'feature',
+    notes: [
+      'The overview now leads with the charts: the KPI band was compacted into a single row per group so the trend, cumulative, and aging charts take significantly more of the slide',
+      'The Cumulative Opened vs Closed chart is now full size and legible instead of a cramped thumbnail',
+      'Removed a redundant context-pill row and tightened chart panels to give every plot more room',
+    ],
+  },
+  {
     version: '1.0.6',
     date: '2026-07-13T12:58:54Z',
     type: 'major',

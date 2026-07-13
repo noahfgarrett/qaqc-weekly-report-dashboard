@@ -495,8 +495,8 @@ export function buildReportModel(
   const sorsSeries = sparkWeeks.map((week) => inspections.filter((row) => row.workWeek?.label === week.label && includesPhase(row.phase, 'SOR')).length)
 
   const kpis: KpiMetric[] = [
-    makeMetric('total-opened', 'Total Issues Opened', totalOpened, previousTotalOpened, ClipboardList, 'neutral', compactNumber, cumOpenedSeries),
-    makeMetric('total-closed', 'Total Issues Closed', totalClosed, previousTotalClosed, CheckCircle2, 'good', compactNumber, cumClosedSeries),
+    makeMetric('total-opened', 'Total Opened', totalOpened, previousTotalOpened, ClipboardList, 'neutral', compactNumber, cumOpenedSeries),
+    makeMetric('total-closed', 'Total Closed', totalClosed, previousTotalClosed, CheckCircle2, 'good', compactNumber, cumClosedSeries),
     makeMetric('opened-week', 'Opened This Week', openedWeek, openedPreviousWeek, TrendingUp, openedWeek > openedPreviousWeek ? 'warn' : 'neutral', compactNumber, openedWeekSeries),
     makeMetric('closed-week', 'Closed This Week', closedWeek, closedPreviousWeek, TrendingDown, closedWeek >= closedPreviousWeek ? 'good' : 'neutral', compactNumber, closedWeekSeries),
     makeMetric('remaining-open', 'Remaining Open', remaining, previousRemaining, AlertCircle, remaining > previousRemaining ? 'warn' : 'good', compactNumber, remainingSeries),

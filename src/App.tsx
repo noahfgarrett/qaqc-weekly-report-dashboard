@@ -775,11 +775,6 @@ function SlideShell({
 function OverviewSlide({ report, exportable }: { report: ReturnType<typeof buildReportModel>; exportable?: boolean }) {
   return (
     <SlideShell title="Weekly QA/QC Report" icon={<Gauge size={18} />} exportable={exportable}>
-      <div className="report-pills">
-        <span>OAC Through {report.reportWeek.label}</span>
-        <span>{report.source === 'files' ? 'Imported Files' : 'Preview Layout'}</span>
-        <span>Report Week {report.reportWeek.label}</span>
-      </div>
       <KpiZone report={report} />
       <div className="overview-grid">
         <article className="panel chart-panel wide">
