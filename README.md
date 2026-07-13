@@ -38,7 +38,7 @@ npm run build
 The single-file HTML output is written to:
 
 ```text
-outputs/QAQC-Weekly-Report-Dashboard.html
+outputs/QAQC-Weekly-Report-Dashboard-v<version>.html
 ```
 
 ## Release Workflow
@@ -46,7 +46,7 @@ outputs/QAQC-Weekly-Report-Dashboard.html
 1. Update `package.json` version and `src/data/changelog.ts`.
 2. Run `npm run build`.
 3. Create a GitHub release tag.
-4. Attach `outputs/QAQC-Weekly-Report-Dashboard.html` to the release.
+4. Attach the versioned HTML file from `outputs/` to the release.
 
 The in-app updater expects the latest release to include an `.html` asset. The modal downloads that asset directly as a browser download; users do not need to open GitHub.
 
