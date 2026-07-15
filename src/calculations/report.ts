@@ -131,9 +131,9 @@ function normalizeIssue(row: Record<string, unknown>): IssueRecord {
 
 function normalizeInspection(row: Record<string, unknown>): InspectionRecord {
   return {
-    phase: value(row, ['Inspection Phase', 'Phase']),
-    workWeek: parseWorkWeek(value(row, ['Work Week Observed', 'Work Week', 'WW'])),
-    issue: value(row, ['Issue?', 'Issue', 'Issues Found']),
+    phase: value(row, ['Inspection Phase', 'Phase of Inspection', 'Inspection Status', 'Phase']),
+    workWeek: parseWorkWeek(value(row, ['Work Week Observed', 'Observed Work Week', 'Week Observed', 'WW Observed', 'Work Week', 'WW'])),
+    issue: value(row, ['Issue?', 'Issues?', 'Issue Found?', 'Issues Found', 'Issue']),
     contractor: value(row, ['Contractor', 'Responsible Contractor']) || 'Unassigned',
     discipline: value(row, ['Discipline', 'Trade']) || 'Unassigned',
     subtype: value(row, ['Subtype', 'Sub Type', 'Inspection Type']) || 'Uncategorized',
@@ -142,9 +142,9 @@ function normalizeInspection(row: Record<string, unknown>): InspectionRecord {
 
 function normalizeWeld(row: Record<string, unknown>): WeldRecord {
   return {
-    no: value(row, ['NO', 'No', 'Weld No', 'Weld ID']),
-    workWeek: parseWorkWeek(value(row, ['WELD WORK WEEK', 'Weld Work Week', 'Work Week'])),
-    signature: value(row, ['SIGNATURE', 'Signature', 'Signed By']),
+    no: value(row, ['NO', 'No.', 'Weld No', 'Weld Number', 'Weld #', 'Weld ID']),
+    workWeek: parseWorkWeek(value(row, ['WELD WORK WEEK', 'Weld Work Week', 'Weld WW', 'Work Week Welded', 'Work Week'])),
+    signature: value(row, ['SIGNATURE', 'Weld Signature', 'Inspector Signature', 'Signed By', 'Signed']),
     issueCreated: value(row, ['ISSUE CREATED? (Put BIM # If Yes)', 'Issue Created?', 'Issue Created', 'BIM #']),
     contractor: value(row, ['Contractor', 'Responsible Contractor']) || 'Unassigned',
     discipline: value(row, ['Discipline', 'Trade']) || 'Welding',
@@ -283,7 +283,13 @@ function makeMetric(
 }
 
 function phaseEquals(phase: string, expected: string): boolean {
-  return phase.trim().toLowerCase() === expected.toLowerCase()
+  const normalized = phase.trim().toLowerCase()
+  const target = expected.toLowerCase()
+  if (normalized === target) return true
+  if (target === 'final') {
+    return normalized.startsWith('final ') || normalized.includes('final inspection')
+  }
+  return false
 }
 
 function includesPhase(phase: string, expected: string): boolean {
@@ -497,8 +503,8 @@ export function buildReportModel(
   const kpis: KpiMetric[] = [
     makeMetric('total-opened', 'Total Opened', totalOpened, previousTotalOpened, ClipboardList, 'neutral', compactNumber, cumOpenedSeries),
     makeMetric('total-closed', 'Total Closed', totalClosed, previousTotalClosed, CheckCircle2, 'good', compactNumber, cumClosedSeries),
-    makeMetric('opened-week', 'Opened This Week', openedWeek, openedPreviousWeek, TrendingUp, openedWeek > openedPreviousWeek ? 'warn' : 'neutral', compactNumber, openedWeekSeries),
-    makeMetric('closed-week', 'Closed This Week', closedWeek, closedPreviousWeek, TrendingDown, closedWeek >= closedPreviousWeek ? 'good' : 'neutral', compactNumber, closedWeekSeries),
+    makeMetric('opened-week', 'Issues Opened', openedWeek, openedPreviousWeek, TrendingUp, openedWeek > openedPreviousWeek ? 'warn' : 'neutral', compactNumber, openedWeekSeries),
+    makeMetric('closed-week', 'Issues Closed', closedWeek, closedPreviousWeek, TrendingDown, closedWeek >= closedPreviousWeek ? 'good' : 'neutral', compactNumber, closedWeekSeries),
     makeMetric('remaining-open', 'Remaining Open', remaining, previousRemaining, AlertCircle, remaining > previousRemaining ? 'warn' : 'good', compactNumber, remainingSeries),
     makeMetric('inspections', 'Inspections', inspectionsWeek, inspectionsPrevious, ClipboardCheck, 'good', compactNumber, inspectionsSeries),
     makeMetric('sors', 'SORs', sorsWeek, sorsPrevious, Wrench, sorsWeek > sorsPrevious ? 'warn' : 'neutral', compactNumber, sorsSeries),

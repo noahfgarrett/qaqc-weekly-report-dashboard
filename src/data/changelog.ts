@@ -7,6 +7,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.0.9',
+    date: '2026-07-15T11:23:09Z',
+    type: 'major',
+    notes: [
+      'The overview report was rebuilt around equal Project to Date and reporting-week KPI panels, with the redundant title bar removed to give every chart more room',
+      'Issues by Work Week now spans the full slide with Opened and Closed bars, a secondary-axis Remaining Open line, readable data labels, and compact WW## axis labels',
+      'Cumulative Opened vs Closed and Issue Aging now use the full lower report band with clearer axes and direct values',
+      'BIM issue details now continue across as many PDF and PowerPoint slides as needed instead of stopping after the first 16 rows',
+      'PowerPoint export now downloads reliably from the standalone HTML app, and Electrical and Welding imports accept common Smartsheet header and work-week variations',
+      'PowerPoint charts remain editable vector objects when resized, while PDF slides now render at 3x resolution for sharper report distribution',
+    ],
+  },
+  {
     version: '1.0.8',
     date: '2026-07-13T20:03:00Z',
     type: 'feature',

@@ -19,11 +19,27 @@ const KNOWN_HEADERS = new Set([
   'createdon',
   'updatedon',
   'inspectionphase',
+  'phaseofinspection',
+  'inspectionstatus',
   'workweekobserved',
+  'observedworkweek',
+  'weekobserved',
+  'wwobserved',
   'issue',
+  'issues',
+  'issuefound',
+  'issuesfound',
   'no',
+  'weldno',
+  'weldnumber',
+  'weldid',
   'weldworkweek',
+  'weldww',
+  'workweekwelded',
   'signature',
+  'weldsignature',
+  'inspectorsignature',
+  'signedby',
   'issuecreatedputbimifyes',
 ])
 
@@ -207,14 +223,22 @@ function includesAll(headers: Set<string>, values: string[]): boolean {
   return values.every((header) => headers.has(header))
 }
 
+function includesAny(headers: Set<string>, values: string[]): boolean {
+  return values.some((header) => headers.has(header))
+}
+
 function roleScores(fileName: string, headers: Set<string>): Record<SheetRole, number> {
   const name = normalized(fileName.replace(/\.[^.]+$/, ''))
-  const inspectionHeaders = includesAll(headers, ['inspectionphase', 'workweekobserved'])
+  const inspectionHeaders = includesAny(headers, ['inspectionphase', 'phaseofinspection', 'inspectionstatus'])
+    && includesAny(headers, ['workweekobserved', 'observedworkweek', 'weekobserved', 'wwobserved', 'workweek'])
+  const weldingHeaders = includesAny(headers, ['no', 'weldno', 'weldnumber', 'weldid'])
+    && includesAny(headers, ['weldworkweek', 'weldww', 'workweekwelded'])
+    && includesAny(headers, ['signature', 'weldsignature', 'inspectorsignature', 'signedby', 'signed'])
   const scores: Record<SheetRole, number> = {
     bimIssues: includesAll(headers, ['id', 'status', 'createdon']) ? 12 : 0,
     mechanical: inspectionHeaders ? 7 : 0,
     electrical: inspectionHeaders ? 7 : 0,
-    welding: includesAll(headers, ['no', 'weldworkweek', 'signature']) ? 12 : 0,
+    welding: weldingHeaders ? 12 : 0,
   }
 
   if (name.includes('bim') && name.includes('issue')) scores.bimIssues += 14

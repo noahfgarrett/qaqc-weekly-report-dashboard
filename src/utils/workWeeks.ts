@@ -73,11 +73,18 @@ export function toIsoWorkWeek(dateInput: Date): WorkWeek {
 }
 
 export function parseWorkWeek(label: unknown): WorkWeek | null {
-  if (typeof label !== 'string') return null
-  const match = label.trim().match(/^WW\s*(\d{1,2})['’]?\s*(\d{4})$/i)
+  if (label instanceof Date && !Number.isNaN(label.getTime())) return toIsoWorkWeek(label)
+  if (typeof label !== 'string' && typeof label !== 'number') return null
+  const text = String(label).trim()
+  if (!text) return null
+
+  // Smartsheet/Excel exports vary between WW27'2026, WW 27 - 2026,
+  // Week 27 2026, and two-digit years. Normalize all of those here.
+  const match = text.match(/^(?:WW|WK|WEEK)?\s*(\d{1,2})\s*(?:['’/_,.\-]|\s)\s*(\d{2,4})$/i)
   if (!match) return null
   const week = Number(match[1])
-  const year = Number(match[2])
+  const yearValue = Number(match[2])
+  const year = yearValue < 100 ? 2000 + yearValue : yearValue
   if (week < 1 || week > 53) return null
   return {
     week,

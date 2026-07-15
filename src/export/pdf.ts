@@ -17,7 +17,7 @@ export async function exportSlidesPdf(report: ReportModel): Promise<void> {
     if (index > 0) pdf.addPage([13.333, 7.5], 'landscape')
     const canvas = await html2canvas(slide, {
       backgroundColor: '#ffffff',
-      scale: 2,
+      scale: 3,
       useCORS: true,
       logging: false,
       windowWidth: slide.scrollWidth,

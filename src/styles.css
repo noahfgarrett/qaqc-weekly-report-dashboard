@@ -813,7 +813,7 @@ select:disabled {
   display: flex;
   flex: 0 0 auto;
   justify-content: space-between;
-  padding: 0 2px 12px;
+  padding: 0 2px 8px;
 }
 
 .slide-header > div {
@@ -838,6 +838,13 @@ select:disabled {
   font-weight: 700;
   letter-spacing: -0.01em;
   margin: 0;
+}
+
+.slide-meta {
+  color: var(--muted);
+  font-size: 10.5px;
+  font-style: normal;
+  font-weight: 650;
 }
 
 .report-pills {
@@ -865,22 +872,34 @@ select:disabled {
   display: grid;
   flex: 0 0 auto;
   gap: 12px;
-  grid-template-columns: 1.62fr 1fr;
-  margin: 12px 0 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 8px 0 0;
+}
+
+.slide-frame.headerless .kpi-groups {
+  margin-top: 0;
 }
 
 .kpi-group {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
   min-width: 0;
+}
+
+.kpi-group.primary,
+.kpi-group.this-week {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 6px 12px 8px;
+}
+
+.kpi-group.primary {
+  background: #f8faff;
 }
 
 .kpi-group.this-week {
   background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 8px 12px 10px;
 }
 
 .kpi-group-head {
@@ -911,9 +930,9 @@ select:disabled {
   min-height: 0;
 }
 
-/* Single compact row: Remaining Open hero (wider) + three supporting tiles */
 .kpi-group.primary .kpi-group-body {
-  grid-template-columns: 1.35fr 1fr 1fr 1fr;
+  flex: 1;
+  grid-template-columns: repeat(2, 1fr);
 }
 
 .kpi-group.this-week .kpi-group-body {
@@ -938,7 +957,7 @@ select:disabled {
   gap: 3px;
 }
 
-/* This-week tiles sit inside a panel — borderless cells, no nested cards */
+.kpi-group.primary .kpi-tile,
 .kpi-group.this-week .kpi-tile {
   background: transparent;
   border: 0;
@@ -970,6 +989,7 @@ select:disabled {
   width: 26px;
 }
 
+.kpi-group.primary .kpi-icon,
 .kpi-group.this-week .kpi-icon {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -1006,6 +1026,7 @@ select:disabled {
   letter-spacing: -0.02em;
 }
 
+.kpi-group.primary .kpi-tile strong,
 .kpi-group.this-week .kpi-tile strong {
   font-size: 20px;
 }
@@ -1033,15 +1054,21 @@ select:disabled {
 }
 
 .kpi-spark {
-  display: block;
   height: 16px;
   margin-top: 1px;
-  overflow: visible;
+  position: relative;
   width: 100%;
 }
 
-.kpi-tile.hero .kpi-spark {
+.kpi-spark.hero {
   height: 22px;
+}
+
+.kpi-spark-svg {
+  display: block;
+  height: 100%;
+  overflow: visible;
+  width: 100%;
 }
 
 .spark-line {
@@ -1057,8 +1084,18 @@ select:disabled {
   opacity: 0.06;
 }
 
-.spark-dot {
-  fill: var(--accent);
+.kpi-spark-dot {
+  background: var(--accent);
+  border-radius: 50%;
+  height: 5px;
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 5px;
+}
+
+.kpi-spark.hero .kpi-spark-dot {
+  height: 6px;
+  width: 6px;
 }
 
 /* ======================= Panels + charts grid ======================= */
@@ -1067,9 +1104,9 @@ select:disabled {
   display: grid;
   flex: 1 1 auto;
   gap: 10px;
-  grid-template-columns: 2.05fr 1fr;
-  grid-template-rows: 1fr 1fr;
-  margin-top: 10px;
+  grid-template-columns: minmax(0, 1.75fr) minmax(250px, 0.75fr);
+  grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+  margin-top: 8px;
   min-height: 0;
 }
 
@@ -1085,8 +1122,8 @@ select:disabled {
   padding: 12px 14px;
 }
 
-.panel.wide {
-  grid-row: span 2;
+.overview-trend-panel {
+  grid-column: 1 / -1;
 }
 
 .chart-panel {
@@ -1268,6 +1305,22 @@ select:disabled {
   font-weight: 600;
 }
 
+.axis-title {
+  fill: var(--faint);
+  font-size: 8.5px;
+  font-weight: 700;
+}
+
+.remaining-axis-label {
+  fill: var(--c-remaining);
+}
+
+.week-axis-label {
+  fill: var(--muted);
+  font-size: 8px;
+  font-weight: 600;
+}
+
 .bar-value {
   fill: var(--ink-2);
   font-size: 9.5px;
@@ -1276,6 +1329,31 @@ select:disabled {
   paint-order: stroke;
   stroke: var(--white);
   stroke-width: 3px;
+}
+
+.bar-value.dense {
+  font-size: 8px;
+  stroke-width: 2.5px;
+}
+
+.bar-value.inside {
+  fill: var(--white);
+  paint-order: normal;
+  stroke: none;
+}
+
+.line-value,
+.series-data-label {
+  font-size: 8.5px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 750;
+  paint-order: stroke;
+  stroke: var(--white);
+  stroke-width: 3px;
+}
+
+.line-value {
+  fill: var(--c-remaining);
 }
 
 .series-end-label {
@@ -1652,6 +1730,9 @@ select:disabled {
   border: 1px solid var(--border);
   border-radius: 18px;
   box-shadow: var(--e-pop);
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 40px);
   max-width: 540px;
   padding: 20px;
   width: 100%;
@@ -1664,8 +1745,22 @@ select:disabled {
 .modal-header {
   align-items: center;
   display: flex;
+  flex: 0 0 auto;
   justify-content: space-between;
   margin-bottom: 14px;
+}
+
+.update-tabs {
+  flex: 0 0 auto;
+}
+
+/* The scrollable body of a modal keeps the header and tabs pinned */
+.changelog-list,
+.update-card,
+.connect-panel {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .modal-header h2 {

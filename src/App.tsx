@@ -78,6 +78,12 @@ const EMPTY_BUNDLE: SheetBundle = {
 }
 
 const PREVIEW_BUNDLE = buildSampleBundle()
+const ISSUE_ROWS_PER_EXPORT_SLIDE = 16
+
+function chunkRows<T>(rows: T[], size: number): T[][] {
+  if (rows.length === 0) return [[]]
+  return Array.from({ length: Math.ceil(rows.length / size) }, (_, index) => rows.slice(index * size, (index + 1) * size))
+}
 
 function cx(...classes: Array<string | false | null | undefined>): string {
   return classes.filter(Boolean).join(' ')
@@ -234,12 +240,16 @@ function Sparkline({ data, hero }: { data: number[]; hero?: boolean }) {
   const line = points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x.toFixed(1)} ${point.y.toFixed(1)}`).join(' ')
   const last = points[points.length - 1]
   const area = `${line} L ${last.x.toFixed(1)} ${h - pad} L ${points[0].x.toFixed(1)} ${h - pad} Z`
+  // The SVG is stretched non-uniformly, so the end marker is a real round HTML
+  // element positioned over the line rather than a squashed SVG circle.
   return (
-    <svg className="kpi-spark" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" aria-hidden="true">
-      <path className="spark-area" d={area} />
-      <path className="spark-line" d={line} vectorEffect="non-scaling-stroke" />
-      <circle className="spark-dot" cx={last.x} cy={last.y} r={hero ? 2.4 : 2} />
-    </svg>
+    <div className={cx('kpi-spark', hero && 'hero')} aria-hidden="true">
+      <svg className="kpi-spark-svg" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none">
+        <path className="spark-area" d={area} />
+        <path className="spark-line" d={line} vectorEffect="non-scaling-stroke" />
+      </svg>
+      <span className="kpi-spark-dot" style={{ left: `${last.x}%`, top: `${(last.y / h) * 100}%` }} />
+    </div>
   )
 }
 
@@ -269,13 +279,12 @@ function KpiTile({ metric, hero }: { metric: KpiMetric; hero?: boolean }) {
 }
 
 const KPI_GROUPS = {
-  primary: { hero: 'remaining-open', rest: ['total-opened', 'total-closed', 'closure-rate'] },
+  primary: ['remaining-open', 'total-opened', 'total-closed', 'closure-rate'],
   week: ['opened-week', 'closed-week', 'inspections', 'sors'],
 } as const
 
 function KpiZone({ report }: { report: ReturnType<typeof buildReportModel> }) {
   const byId = new Map(report.kpis.map((metric) => [metric.id, metric]))
-  const hero = byId.get(KPI_GROUPS.primary.hero)
   return (
     <div className="kpi-groups">
       <section className="kpi-group primary">
@@ -284,8 +293,7 @@ function KpiZone({ report }: { report: ReturnType<typeof buildReportModel> }) {
           <em>Through {report.reportWeek.label}</em>
         </div>
         <div className="kpi-group-body">
-          {hero && <KpiTile metric={hero} hero />}
-          {KPI_GROUPS.primary.rest.map((id) => {
+          {KPI_GROUPS.primary.map((id) => {
             const metric = byId.get(id)
             return metric ? <KpiTile key={id} metric={metric} /> : null
           })}
@@ -293,8 +301,7 @@ function KpiZone({ report }: { report: ReturnType<typeof buildReportModel> }) {
       </section>
       <section className="kpi-group this-week">
         <div className="kpi-group-head">
-          <span>This week</span>
-          <em>{report.reportWeek.label}</em>
+          <span>{report.reportWeek.label}</span>
         </div>
         <div className="kpi-group-body">
           {KPI_GROUPS.week.map((id) => {
@@ -323,6 +330,7 @@ function FilterMenu({
   disabled?: boolean
 }) {
   const [open, setOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
   const active = !disabled && selected.length > 0
   const display = disabled
     ? 'OAC range'
@@ -332,8 +340,24 @@ function FilterMenu({
         ? selected[0]
         : 'Multiple'
 
+  useEffect(() => {
+    if (!open) return
+    function handlePointerDown(event: PointerEvent): void {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) setOpen(false)
+    }
+    function handleKey(event: KeyboardEvent): void {
+      if (event.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('pointerdown', handlePointerDown)
+    document.addEventListener('keydown', handleKey)
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown)
+      document.removeEventListener('keydown', handleKey)
+    }
+  }, [open])
+
   return (
-    <div className="filter-menu">
+    <div className="filter-menu" ref={menuRef}>
       <button className={cx('filter-button', active && 'active')} type="button" onClick={() => setOpen((value) => !value)} disabled={disabled}>
         {icon}
         <span>{label}</span>
@@ -405,6 +429,15 @@ function chartValue(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(1)
 }
 
+function shortWorkWeek(label: string): string {
+  return label.replace(/^WW(\d{2})['’]\d{2}(\d{2})$/i, "$1'$2")
+}
+
+function workWeekNumber(label: string): string {
+  const match = label.match(/^WW(\d{1,2})/i)
+  return match ? `WW${match[1].padStart(2, '0')}` : label
+}
+
 function ChartTooltip({
   title,
   entries,
@@ -431,23 +464,15 @@ function RangeChart({ data }: { data: WeeklyIssuePoint[] }) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
   const visible = data.slice(-30)
   const width = 980
-  const height = 360
-  const pad = { l: 46, r: 22 }
+  const height = 82
+  const pad = { l: 40, r: 44, t: 10, b: 20 }
   const chartW = width - pad.l - pad.r
+  const chartH = height - pad.t - pad.b
   const group = chartW / Math.max(visible.length, 1)
-  // Two stacked plots sharing the work-week x-axis, each with its own scale, so
-  // the backlog line and the weekly bars are both legible (no dual y-axis).
-  const lineTop = 16
-  const lineH = 166
-  const barTop = 214
-  const barH = 104
-  const xLabelY = height - 8
-  const lineScale = niceScale(Math.max(1, ...visible.map((point) => point.remainingOpen)), 3)
-  const barScale = niceScale(Math.max(1, ...visible.flatMap((point) => [point.opened, point.closed])), 2)
-  const toYLine = (value: number) => lineTop + lineH - (value / lineScale.max) * lineH
-  const toYBar = (value: number) => barTop + barH - (value / barScale.max) * barH
-  const columnTop = lineTop
-  const columnH = barTop + barH - lineTop
+  const lineScale = niceScale(Math.max(1, ...visible.map((point) => point.remainingOpen)), 4)
+  const barScale = niceScale(Math.max(1, ...visible.flatMap((point) => [point.opened, point.closed])), 4)
+  const toYLine = (value: number) => pad.t + chartH - (value / lineScale.max) * chartH
+  const toYBar = (value: number) => pad.t + chartH - (value / barScale.max) * chartH
   const points = visible.map((point, index) => ({
     x: pad.l + index * group + group / 2,
     y: toYLine(point.remainingOpen),
@@ -473,63 +498,60 @@ function RangeChart({ data }: { data: WeeklyIssuePoint[] }) {
             <stop offset="100%" stopColor="#c2870b" stopOpacity="0" />
           </linearGradient>
         </defs>
+        {barScale.ticks.map((tick) => (
+          <g key={`bar-axis-${tick}`}>
+            <line x1={pad.l} x2={width - pad.r} y1={toYBar(tick)} y2={toYBar(tick)} className="grid-line" />
+            <text className="tick-label" x={pad.l - 9} y={toYBar(tick) + 4} textAnchor="end">{chartValue(tick)}</text>
+          </g>
+        ))}
+        {lineScale.ticks.map((tick) => (
+          <text key={`line-axis-${tick}`} className="tick-label remaining-axis-label" x={width - pad.r + 9} y={toYLine(tick) + 4}>{chartValue(tick)}</text>
+        ))}
+        <text className="axis-title" x={pad.l} y={pad.t - 3}>ISSUES / WEEK</text>
+        <text className="axis-title remaining-axis-label" x={width - pad.r} y={pad.t - 3} textAnchor="end">REMAINING OPEN</text>
 
-        {/* Latest-week highlight + hover targets span the full column */}
         {visible.map((point, index) => {
           const isLatest = index === visible.length - 1
           return (
             <g key={`hit-${point.workWeek}`} onMouseEnter={() => setHoveredIndex(index)} onMouseLeave={() => setHoveredIndex(null)}>
-              {isLatest && <rect className="report-week-band" x={pad.l + index * group} y={columnTop} width={group} height={columnH} rx="6" />}
-              <rect className="chart-hit-area" x={pad.l + index * group} y={columnTop} width={group} height={columnH} />
+              {isLatest && <rect className="report-week-band" x={pad.l + index * group} y={pad.t} width={group} height={chartH} rx="6" />}
+              <rect className="chart-hit-area" x={pad.l + index * group} y={pad.t} width={group} height={chartH} />
             </g>
           )
         })}
-
-        {/* Top plot: Remaining Open backlog line */}
-        {lineScale.ticks.map((tick) => (
-          <g key={`l-${tick}`}>
-            <line x1={pad.l} x2={width - pad.r} y1={toYLine(tick)} y2={toYLine(tick)} className="grid-line" />
-            <text className="tick-label" x={pad.l - 8} y={toYLine(tick) + 4} textAnchor="end">{chartValue(tick)}</text>
-          </g>
-        ))}
-        <text className="chart-subhead" x={pad.l} y={lineTop - 4}>Remaining open</text>
-        <path d={areaPath(points, lineTop + lineH)} className="remaining-area" />
-        <path d={smoothPath(points)} className="remaining-line" fill="none" />
-        {points.map(({ x, y, point }) => (
-          <circle key={point.workWeek} cx={x} cy={y} r={point === hovered ? 5 : 3} className="remaining-dot" />
-        ))}
-        {points.length > 0 && (
-          <text className="series-end-label" x={points[points.length - 1].x - 8} y={Math.max(lineTop + 12, points[points.length - 1].y - 10)} textAnchor="end">
-            {`Open ${points[points.length - 1].point.remainingOpen}`}
-          </text>
-        )}
-
-        {/* Bottom plot: weekly Opened / Closed bars */}
-        {barScale.ticks.map((tick) => (
-          <g key={`b-${tick}`}>
-            <line x1={pad.l} x2={width - pad.r} y1={toYBar(tick)} y2={toYBar(tick)} className="grid-line" />
-            <text className="tick-label" x={pad.l - 8} y={toYBar(tick) + 4} textAnchor="end">{chartValue(tick)}</text>
-          </g>
-        ))}
-        <text className="chart-subhead" x={pad.l} y={barTop - 8}>Opened / Closed per week</text>
         {visible.map((point, index) => {
-          const baseX = pad.l + index * group + group * 0.2
-          const openedH = (point.opened / barScale.max) * barH
-          const closedH = (point.closed / barScale.max) * barH
-          const isActive = index === hoveredIndex
-          const isLatest = index === visible.length - 1
+          const baseX = pad.l + index * group + group * 0.17
+          const openedH = (point.opened / barScale.max) * chartH
+          const closedH = (point.closed / barScale.max) * chartH
+          const barWidth = Math.max(3, group * 0.25)
+          const openedInside = openedH >= 9
+          const closedInside = closedH >= 9
           return (
             <g key={point.workWeek}>
-              <rect className="bar opened" x={baseX} y={barTop + barH - openedH} width={group * 0.22} height={openedH} rx="2" />
-              <rect className="bar closed" x={baseX + group * 0.32} y={barTop + barH - closedH} width={group * 0.22} height={closedH} rx="2" />
-              {(isActive || isLatest) && point.opened > 0 && <text className="bar-value" x={baseX + group * 0.11} y={toYBar(point.opened) - 5} textAnchor="middle">{point.opened}</text>}
-              {(isActive || isLatest) && point.closed > 0 && <text className="bar-value" x={baseX + group * 0.43} y={toYBar(point.closed) - 5} textAnchor="middle">{point.closed}</text>}
-              {(index % 5 === 0 || isLatest) && (
-                <text x={pad.l + index * group + group / 2} y={xLabelY} textAnchor="middle">{point.workWeek.replace('WW', '')}</text>
-              )}
+              <rect className="bar opened" x={baseX} y={pad.t + chartH - openedH} width={barWidth} height={openedH} rx="2.5" />
+              <rect className="bar closed" x={baseX + group * 0.34} y={pad.t + chartH - closedH} width={barWidth} height={closedH} rx="2.5" />
+              {point.opened > 0 && <text className={cx('bar-value', 'dense', openedInside && 'inside')} x={baseX + barWidth / 2} y={openedInside ? pad.t + chartH - 2.5 : toYBar(point.opened) - 2.5} textAnchor="middle">{point.opened}</text>}
+              {point.closed > 0 && <text className={cx('bar-value', 'dense', closedInside && 'inside')} x={baseX + group * 0.34 + barWidth / 2} y={closedInside ? pad.t + chartH - 2.5 : toYBar(point.closed) - 2.5} textAnchor="middle">{point.closed}</text>}
+              <text
+                className="week-axis-label"
+                transform={`translate(${pad.l + index * group + group / 2} ${height - 10}) rotate(-40)`}
+                textAnchor="end"
+              >
+                {workWeekNumber(point.workWeek)}
+              </text>
             </g>
           )
         })}
+        <path d={areaPath(points, pad.t + chartH)} className="remaining-area" />
+        <path d={smoothPath(points)} className="remaining-line" fill="none" />
+        {points.map(({ x, y, point }, index) => (
+          <g key={point.workWeek}>
+            <circle cx={x} cy={y} r={index === hoveredIndex ? 4.5 : 3} className="remaining-dot" />
+            {(index % 3 === 0 || index === points.length - 1) && (
+              <text className="line-value" x={x} y={Math.max(pad.t + 7, y - 4.5)} textAnchor="middle">{point.remainingOpen}</text>
+            )}
+          </g>
+        ))}
       </svg>
       {hovered && hoveredPoint && (
         <ChartTooltip
@@ -544,11 +566,11 @@ function RangeChart({ data }: { data: WeeklyIssuePoint[] }) {
 
 function MonthlyChart({ data }: { data: MonthlyIssuePoint[] }) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
-  const visible = data.slice(-8)
+  const visible = data.slice(-10)
   const { max, ticks } = niceScale(Math.max(1, ...visible.flatMap((point) => [point.opened, point.closed])))
-  const width = 460
-  const height = 230
-  const pad = { l: 48, r: 22, t: 18, b: 42 }
+  const width = 700
+  const height = 150
+  const pad = { l: 44, r: 18, t: 20, b: 30 }
   const chartW = width - pad.l - pad.r
   const chartH = height - pad.t - pad.b
   const step = chartW / Math.max(1, visible.length - 1)
@@ -583,22 +605,24 @@ function MonthlyChart({ data }: { data: MonthlyIssuePoint[] }) {
         {visible.map((point, index) => (
           <g key={point.month} onMouseEnter={() => setHoveredIndex(index)} onMouseLeave={() => setHoveredIndex(null)}>
             <rect className="chart-hit-area" x={pad.l + index * step - step / 2} y={pad.t} width={step} height={chartH} />
-            {(index % 2 === 0 || index === visible.length - 1) && (
-              <text x={pad.l + index * step} y={height - 12} textAnchor="middle">{point.month}</text>
-            )}
+            <text x={pad.l + index * step} y={height - 12} textAnchor="middle">{point.month}</text>
           </g>
         ))}
         <path d={`${smoothPath(openedPoints)} ${[...closedPoints].reverse().map((point) => `L ${point.x} ${point.y}`).join(' ')} Z`} className="monthly-gap-area" />
         <path d={smoothPath(openedPoints)} className="opened-line" fill="none" />
         <path d={smoothPath(closedPoints)} className="closed-line" fill="none" />
-        {openedPoints.map((point, index) => <circle key={`opened-${visible[index].month}`} cx={point.x} cy={point.y} r={index === hoveredIndex ? 4 : 2.5} className="opened-dot" />)}
-        {closedPoints.map((point, index) => <circle key={`closed-${visible[index].month}`} cx={point.x} cy={point.y} r={index === hoveredIndex ? 4 : 2.5} className="closed-dot" />)}
-        {visible.length > 0 && (
-          <>
-            <text className="series-end-label opened-label" x={openedPoints[openedPoints.length - 1].x - 5} y={openedPoints[openedPoints.length - 1].y - 8} textAnchor="end">{visible[visible.length - 1].opened}</text>
-            <text className="series-end-label closed-label" x={closedPoints[closedPoints.length - 1].x - 5} y={closedPoints[closedPoints.length - 1].y + 14} textAnchor="end">{visible[visible.length - 1].closed}</text>
-          </>
-        )}
+        {openedPoints.map((point, index) => (
+          <g key={`opened-${visible[index].month}`}>
+            <circle cx={point.x} cy={point.y} r={index === hoveredIndex ? 4 : 2.8} className="opened-dot" />
+            <text className="series-data-label opened-label" x={point.x} y={Math.max(12, point.y - 9)} textAnchor="middle">{visible[index].opened}</text>
+          </g>
+        ))}
+        {closedPoints.map((point, index) => (
+          <g key={`closed-${visible[index].month}`}>
+            <circle cx={point.x} cy={point.y} r={index === hoveredIndex ? 4 : 2.8} className="closed-dot" />
+            <text className="series-data-label closed-label" x={point.x} y={Math.min(height - pad.b - 4, point.y + 15)} textAnchor="middle">{visible[index].closed}</text>
+          </g>
+        ))}
       </svg>
       {hovered && (
         <ChartTooltip
@@ -685,7 +709,7 @@ function ElectricalChart({ data }: { data: ElectricalPoint[] }) {
               {isLatest && <text className="series-end-label electrical-label" x={x - 7} y={Math.max(pad.t + 12, y - 10)} textAnchor="end">{point.finals}</text>}
               {(index % 4 === 0 || isLatest) && (
                 <text x={x} y={height - 22} textAnchor="middle">
-                  {point.workWeek.replace('WW', '')}
+                  {shortWorkWeek(point.workWeek)}
                 </text>
               )}
             </g>
@@ -749,7 +773,7 @@ function WeldingChart({ data }: { data: WeldingPoint[] }) {
               )}
               {(index % 4 === 0 || isLatest) && (
                 <text x={pad.l + index * group + group / 2} y={height - 22} textAnchor="middle">
-                  {point.workWeek.replace('WW', '')}
+                  {shortWorkWeek(point.workWeek)}
                 </text>
               )}
             </g>
@@ -772,23 +796,34 @@ function SlideShell({
   title,
   icon,
   exportable,
+  meta,
+  hideHeader,
 }: {
   children: React.ReactNode
   title: string
   icon: React.ReactNode
   exportable?: boolean
+  meta?: string
+  hideHeader?: boolean
 }) {
   return (
-    <section className="slide-frame" {...(exportable ? { 'data-export-slide': true } : {})}>
+    <section
+      className={cx('slide-frame', hideHeader && 'headerless')}
+      aria-label={title}
+      {...(exportable ? { 'data-export-slide': true } : {})}
+    >
       <div className="gc-guard top" />
       <div className="gc-guard bottom" />
       <div className="slide-safe">
-        <header className="slide-header">
-          <div>
-            <span>{icon}</span>
-            <h2>{title}</h2>
-          </div>
-        </header>
+        {!hideHeader && (
+          <header className="slide-header">
+            <div>
+              <span>{icon}</span>
+              <h2>{title}</h2>
+            </div>
+            {meta && <em className="slide-meta">{meta}</em>}
+          </header>
+        )}
         {children}
       </div>
     </section>
@@ -797,10 +832,10 @@ function SlideShell({
 
 function OverviewSlide({ report, exportable }: { report: ReturnType<typeof buildReportModel>; exportable?: boolean }) {
   return (
-    <SlideShell title="Weekly QA/QC Report" icon={<Gauge size={18} />} exportable={exportable}>
+    <SlideShell title="Weekly QA/QC Report" icon={<Gauge size={18} />} exportable={exportable} hideHeader>
       <KpiZone report={report} />
       <div className="overview-grid">
-        <article className="panel chart-panel wide">
+        <article className="panel chart-panel overview-trend-panel">
           <div className="panel-title">
             <LineChart size={16} />
             <h3>Issues by Work Week</h3>
@@ -826,13 +861,31 @@ function OverviewSlide({ report, exportable }: { report: ReturnType<typeof build
   )
 }
 
-function IssueTableSlide({ report, exportable }: { report: ReturnType<typeof buildReportModel>; exportable?: boolean }) {
+function IssueTableSlide({
+  report,
+  exportable,
+  rows,
+  pageIndex = 0,
+  pageCount = 1,
+}: {
+  report: ReturnType<typeof buildReportModel>
+  exportable?: boolean
+  rows?: IssueDetailRow[]
+  pageIndex?: number
+  pageCount?: number
+}) {
   const groupCounts = report.issueTable.reduce<Record<string, number>>((acc, row) => {
     acc[row.group] = (acc[row.group] ?? 0) + 1
     return acc
   }, {})
+  const visibleRows = rows ?? report.issueTable
   return (
-    <SlideShell title="BIM Issues Detail" icon={<Table2 size={18} />} exportable={exportable}>
+    <SlideShell
+      title="BIM Issues Detail"
+      icon={<Table2 size={18} />}
+      exportable={exportable}
+      meta={pageCount > 1 ? `Page ${pageIndex + 1} of ${pageCount} | ${report.issueTable.length} issues` : `${report.issueTable.length} issues`}
+    >
       <div className="detail-metrics">
         {['Open Carryover', 'Closed in Report Week', 'Opened + Closed in Report Week', 'Closed This Week'].map((group) => (
           <div className="metric-chip" key={group}>
@@ -851,8 +904,8 @@ function IssueTableSlide({ report, exportable }: { report: ReturnType<typeof bui
             </tr>
           </thead>
           <tbody>
-            {report.issueTable.slice(0, 16).map((row) => (
-              <tr key={`${row.id}-${row.workWeekClosed}`}>
+            {visibleRows.map((row, index) => (
+              <tr key={`${row.id}-${row.workWeekClosed}-${index}`}>
                 <td>{row.id}</td>
                 <td>{row.subtype}</td>
                 <td>
@@ -1085,6 +1138,10 @@ export default function App() {
   const showSheetPanel = !hasReport || sheetPanelOpen
 
   const report = useMemo(() => buildReportModel(bundle, filters, new Date()), [bundle, filters])
+  const issueExportPages = useMemo(
+    () => chunkRows(report.issueTable, ISSUE_ROWS_PER_EXPORT_SLIDE),
+    [report.issueTable],
+  )
 
   useEffect(() => {
     saveFilters(filters)
@@ -1256,6 +1313,8 @@ export default function App() {
               setExporting(true)
               try {
                 await exportReportDeck(report)
+              } catch (err) {
+                setError(err instanceof Error ? `PowerPoint export failed: ${err.message}` : 'PowerPoint export failed.')
               } finally {
                 setExporting(false)
               }
@@ -1272,6 +1331,8 @@ export default function App() {
               setPdfExporting(true)
               try {
                 await exportSlidesPdf(report)
+              } catch (err) {
+                setError(err instanceof Error ? `PDF export failed: ${err.message}` : 'PDF export failed.')
               } finally {
                 setPdfExporting(false)
               }
@@ -1392,7 +1453,16 @@ export default function App() {
       {hasReport && (
         <div className="export-deck" aria-hidden="true">
           <OverviewSlide report={report} exportable />
-          <IssueTableSlide report={report} exportable />
+          {issueExportPages.map((rows, index) => (
+            <IssueTableSlide
+              key={`issues-${index}`}
+              report={report}
+              rows={rows}
+              pageIndex={index}
+              pageCount={issueExportPages.length}
+              exportable
+            />
+          ))}
           <FieldSlide report={report} exportable />
         </div>
       )}
