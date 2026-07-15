@@ -7,6 +7,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.0.16',
+    date: '2026-07-15T17:00:00Z',
+    type: 'feature',
+    notes: [
+      'The dashboard now checks GitHub Releases on launch, every 15 minutes, and when the app becomes visible again, automatically presenting newer packaged versions',
+      'Update downloads are fetched from the release tag as CORS-safe packaged HTML and saved locally without navigating away from the dashboard or opening a GitHub page',
+      'The Multitool-style update modal now includes dedicated Update and Changelog tabs, release notes, download progress and success states, and clear network error recovery',
+      'The in-app changelog now uses expandable release entries, version types, dates, latest-version context, and a manual Check now control',
+      'The persistent Updates button now displays an unobtrusive version badge whenever a newer packaged release is available',
+    ],
+  },
+  {
     version: '1.0.15',
     date: '2026-07-15T15:00:00Z',
     type: 'fix',

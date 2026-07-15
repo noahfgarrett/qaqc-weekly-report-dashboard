@@ -9,15 +9,20 @@ const distNamed = resolve(root, 'dist', packagedName)
 const outputDir = resolve(root, 'outputs')
 const outputFile = resolve(outputDir, packagedName)
 const legacyOutputFile = resolve(outputDir, 'QAQC-Weekly-Report-Dashboard.html')
+const releaseDir = resolve(root, 'release')
+const releaseFile = resolve(releaseDir, 'QAQC-Weekly-Report-Dashboard.html')
 
 if (!existsSync(distIndex)) {
   throw new Error('dist/index.html was not generated.')
 }
 
 mkdirSync(outputDir, { recursive: true })
+mkdirSync(releaseDir, { recursive: true })
 copyFileSync(distIndex, distNamed)
 copyFileSync(distIndex, outputFile)
+copyFileSync(distIndex, releaseFile)
 rmSync(legacyOutputFile, { force: true })
 
 console.log(`Wrote ${distNamed}`)
 console.log(`Wrote ${outputFile}`)
+console.log(`Wrote ${releaseFile}`)

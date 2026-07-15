@@ -145,5 +145,9 @@ export interface UpdateInfo {
   downloadUrl: string
   assetApiUrl: string
   assetName: string
-  htmlDownloadUrl?: string
+  downloadKind: 'html' | 'gzip-html'
+  rawDownloadUrl: string
+  fallbackDownloadUrl?: string
+  fallbackAssetApiUrl?: string
+  fallbackAssetName?: string
 }

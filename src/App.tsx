@@ -15,6 +15,7 @@ import {
   FolderOpen,
   Gauge,
   GitBranch,
+  History,
   LineChart,
   PanelLeftClose,
   PanelLeftOpen,
@@ -28,12 +29,13 @@ import {
 } from 'lucide-react'
 import { buildReportModel, mergeFilters } from '@/calculations/report'
 import { buildSampleBundle } from '@/data/sampleData'
-import { CHANGELOG } from '@/data/changelog'
+import { CHANGELOG, type ChangelogEntry } from '@/data/changelog'
 import { exportReportDeck } from '@/export/pptx'
 import { exportSlidesPdf } from '@/export/pdf'
 import { expandImportFiles, filesFromDrop, importSpreadsheet } from '@/services/fileImport'
 import { clearLegacyConnectionData, loadFilters, saveFilters } from '@/services/storage'
-import { checkForUpdate, downloadUpdate } from '@/services/updateChecker'
+import { checkForUpdate } from '@/services/updateChecker'
+import { downloadUpdateFile } from '@/services/updateDownload'
 import type {
   AgingBucket,
   ElectricalPoint,
@@ -133,97 +135,191 @@ function UpdateModal({
   open,
   onClose,
   info,
+  defaultTab,
+  checking,
+  lastChecked,
+  onCheck,
 }: {
   open: boolean
   onClose: () => void
   info: UpdateInfo | null
+  defaultTab: 'update' | 'changelog'
+  checking: boolean
+  lastChecked: Date | null
+  onCheck: () => Promise<void>
 }) {
-  const [tab, setTab] = useState<'update' | 'changelog'>(info ? 'update' : 'changelog')
+  const [tab, setTab] = useState<'update' | 'changelog'>(defaultTab)
   const [downloading, setDownloading] = useState(false)
-  const [downloadMessage, setDownloadMessage] = useState<string | null>(null)
+  const [downloadedFilename, setDownloadedFilename] = useState<string | null>(null)
   const [downloadError, setDownloadError] = useState<string | null>(null)
+  const [expandedVersions, setExpandedVersions] = useState<Set<string>>(
+    () => new Set(CHANGELOG.length > 0 ? [CHANGELOG[0].version] : []),
+  )
+  const [showAll, setShowAll] = useState(false)
 
   useEffect(() => {
     if (open) {
-      setTab(info ? 'update' : 'changelog')
-      setDownloadMessage(null)
+      setTab(defaultTab)
+      setDownloadedFilename(null)
       setDownloadError(null)
     }
-  }, [open, info])
+  }, [open, info?.version, defaultTab])
+
+  const changelogWithUpdate = useMemo(() => {
+    if (!info?.version || CHANGELOG.some((entry) => entry.version === info.version)) return CHANGELOG
+    const notes = info.releaseNotes
+      .split('\n')
+      .map((line) => line.trim().replace(/^[-*#]+\s*/, ''))
+      .filter((line) => Boolean(line) && !/^what changed$/i.test(line) && !/^validation$/i.test(line))
+    const synthetic: ChangelogEntry = {
+      version: info.version,
+      date: new Date().toISOString(),
+      type: 'fix',
+      notes: notes.length > 0 ? notes : ['A new packaged dashboard build is available.'],
+    }
+    return [synthetic, ...CHANGELOG]
+  }, [info])
+
+  useEffect(() => {
+    const latest = changelogWithUpdate[0]
+    if (!latest) return
+    setExpandedVersions(new Set([latest.version]))
+  }, [changelogWithUpdate])
+
+  const visibleEntries = showAll ? changelogWithUpdate : changelogWithUpdate.slice(0, 7)
+  const releaseNotes = info?.releaseNotes
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean) ?? []
+
+  function toggleVersion(version: string): void {
+    setExpandedVersions((previous) => {
+      const next = new Set(previous)
+      if (next.has(version)) next.delete(version)
+      else next.add(version)
+      return next
+    })
+  }
+
+  function formatReleaseDate(value: string): string {
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return ''
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  }
 
   return (
     <Modal open={open} title={info ? 'Update Available' : 'Changelog'} onClose={onClose} wide>
       <div className="update-tabs">
         {info && (
           <button className={cx(tab === 'update' && 'active')} type="button" onClick={() => setTab('update')}>
+            <Download size={14} />
             Update
           </button>
         )}
         <button className={cx(tab === 'changelog' && 'active')} type="button" onClick={() => setTab('changelog')}>
+          <History size={14} />
           Changelog
         </button>
       </div>
       {tab === 'update' && info ? (
-        <div className="update-card">
-          <div className="version-hop">
-            <span>v{__APP_VERSION__}</span>
-            <GitBranch size={15} />
-            <strong>v{info.version}</strong>
+        downloadedFilename ? (
+          <div className="update-success">
+            <span className="update-success-icon"><CheckCircle2 size={30} /></span>
+            <div>
+              <strong>Update download started</strong>
+              <p>{downloadedFilename} is being saved to your Downloads folder.</p>
+            </div>
+            <div className="update-next-step">
+              Open the downloaded HTML for the new version. Your spreadsheet files remain separate from the app.
+            </div>
+            <button className="button secondary" type="button" onClick={onClose}>Done</button>
           </div>
-          <div className="release-notes">
-            {(info.releaseNotes || 'A new dashboard build is available.')
-              .split('\n')
-              .filter(Boolean)
-              .slice(0, 9)
-              .map((line) => (
-                <p key={line}>{line.replace(/^[-#* ]+/, '')}</p>
-              ))}
-          </div>
-          <p className={cx('download-hint', downloadError && 'error')}>
-            {downloadError ?? downloadMessage ?? `${info.assetName} will download directly to your browser downloads folder.`}
-          </p>
-          <div className="modal-actions">
-            <button className="button secondary" type="button" onClick={onClose}>
-              Later
-            </button>
-            <button
-              className="button primary"
-              type="button"
-              disabled={downloading}
-              onClick={async () => {
-                setDownloading(true)
-                setDownloadError(null)
-                setDownloadMessage(null)
-                try {
-                  await downloadUpdate(info)
-                  setDownloadMessage(`${info.assetName} is downloading.`)
-                } catch (err) {
-                  setDownloadError(err instanceof Error ? err.message : 'Unable to download this update.')
-                } finally {
-                  setDownloading(false)
-                }
-              }}
-            >
-              {downloading ? <RefreshCw size={16} className="spin" /> : <Download size={16} />}
-              Download HTML v{info.version}
-            </button>
-          </div>
-        </div>
-      ) : (
-        <div className="changelog-list">
-          {CHANGELOG.map((entry) => (
-            <article className="changelog-entry" key={entry.version}>
+        ) : (
+          <div className="update-card">
+            <div className="version-hop">
+              <span>v{__APP_VERSION__}</span>
+              <GitBranch size={15} />
+              <strong>v{info.version}</strong>
+            </div>
+            <div className="release-notes">
+              {(releaseNotes.length > 0 ? releaseNotes : ['A new packaged dashboard build is available.']).map((line, index) => {
+                const heading = line.match(/^#{1,4}\s+(.+)/)
+                if (heading) return <h4 key={`${line}-${index}`}>{heading[1]}</h4>
+                return <p key={`${line}-${index}`}>{line.replace(/^[-*]\s+/, '')}</p>
+              })}
+            </div>
+            <div className="update-download-note">
+              <ShieldCheck size={17} />
               <div>
-                <strong>v{entry.version}</strong>
-                <span>{new Date(entry.date).toLocaleDateString()}</span>
+                <strong>Direct packaged download</strong>
+                <span>The HTML is fetched inside this app and saved locally. No GitHub page will open.</span>
               </div>
-              <ul>
-                {entry.notes.map((note) => (
-                  <li key={note}>{note}</li>
-                ))}
-              </ul>
-            </article>
-          ))}
+            </div>
+            {downloadError && <p className="download-error">{downloadError}</p>}
+            <div className="modal-actions">
+              <button className="button secondary" type="button" onClick={onClose}>Skip this version</button>
+              <button
+                className="button primary"
+                type="button"
+                disabled={downloading}
+                onClick={async () => {
+                  setDownloading(true)
+                  setDownloadError(null)
+                  try {
+                    const result = await downloadUpdateFile(info)
+                    setDownloadedFilename(result.savedFilename)
+                  } catch {
+                    setDownloadError('The packaged update could not be downloaded inside the app. Check your network or proxy and try again.')
+                  } finally {
+                    setDownloading(false)
+                  }
+                }}
+              >
+                {downloading ? <RefreshCw size={16} className="spin" /> : <Download size={16} />}
+                {downloading ? 'Preparing update' : `Download v${info.version}`}
+              </button>
+            </div>
+          </div>
+        )
+      ) : (
+        <div className="changelog-panel">
+          <div className={cx('update-status', info && 'has-update')}>
+            <span className="update-status-icon">{info ? <Bell size={18} /> : <CheckCircle2 size={18} />}</span>
+            <div>
+              <strong>{info ? `v${info.version} is available` : `v${__APP_VERSION__} is up to date`}</strong>
+              <span>{lastChecked ? `Last checked ${lastChecked.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : 'Checks automatically while the app is open'}</span>
+            </div>
+            <button className="button secondary compact" type="button" disabled={checking} onClick={() => void onCheck()}>
+              <RefreshCw size={14} className={cx(checking && 'spin')} />
+              {checking ? 'Checking' : 'Check now'}
+            </button>
+          </div>
+          <div className="changelog-list">
+            {visibleEntries.map((entry, index) => {
+              const expanded = expandedVersions.has(entry.version)
+              return (
+                <article className={cx('changelog-entry', `type-${entry.type}`, expanded && 'expanded')} key={entry.version}>
+                  <button type="button" className="changelog-entry-header" onClick={() => toggleVersion(entry.version)}>
+                    <ChevronDown size={15} className={cx(!expanded && 'collapsed')} />
+                    <strong>v{entry.version}</strong>
+                    <span className="release-type">{entry.type}</span>
+                    {index === 0 && <span className="latest-label">Latest</span>}
+                    <time>{formatReleaseDate(entry.date)}</time>
+                  </button>
+                  {expanded && (
+                    <ul>
+                      {entry.notes.map((note) => <li key={note}>{note}</li>)}
+                    </ul>
+                  )}
+                </article>
+              )
+            })}
+          </div>
+          {!showAll && changelogWithUpdate.length > visibleEntries.length && (
+            <button className="show-all-releases" type="button" onClick={() => setShowAll(true)}>
+              Show all {changelogWithUpdate.length} releases
+            </button>
+          )}
         </div>
       )}
     </Modal>
@@ -1213,8 +1309,12 @@ export default function App() {
   const [error, setError] = useState<string | null>(null)
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null)
   const [updateOpen, setUpdateOpen] = useState(false)
+  const [updateDefaultTab, setUpdateDefaultTab] = useState<'update' | 'changelog'>('changelog')
+  const [updateChecking, setUpdateChecking] = useState(false)
+  const [lastUpdateCheck, setLastUpdateCheck] = useState<Date | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const folderInputRef = useRef<HTMLInputElement>(null)
+  const dismissedUpdateVersionRef = useRef<string | null>(null)
   const importCount = Object.keys(imports).length
   const filesReady = importCount === 4
   const hasReport = bundle.source === 'files' || bundle.source === 'demo'
@@ -1236,13 +1336,45 @@ export default function App() {
 
   useEffect(() => {
     if (!import.meta.env.PROD) return
-    checkForUpdate().then((info) => {
-      if (info) {
-        setUpdateInfo(info)
+    let active = true
+    const poll = async (): Promise<void> => {
+      const info = await checkForUpdate()
+      if (!active) return
+      setUpdateInfo(info)
+      setLastUpdateCheck(new Date())
+      if (info && dismissedUpdateVersionRef.current !== info.version) {
+        setUpdateDefaultTab('update')
         setUpdateOpen(true)
       }
-    })
+    }
+    void poll()
+    const interval = window.setInterval(() => void poll(), 15 * 60 * 1000)
+    const handleVisibility = (): void => {
+      if (document.visibilityState === 'visible') void poll()
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => {
+      active = false
+      window.clearInterval(interval)
+      document.removeEventListener('visibilitychange', handleVisibility)
+    }
   }, [])
+
+  async function handleManualUpdateCheck(): Promise<void> {
+    if (updateChecking) return
+    setUpdateChecking(true)
+    try {
+      const info = await checkForUpdate()
+      setUpdateInfo(info)
+      setLastUpdateCheck(new Date())
+      if (info) {
+        dismissedUpdateVersionRef.current = null
+        setUpdateDefaultTab('update')
+      }
+    } finally {
+      setUpdateChecking(false)
+    }
+  }
 
   function bundleForImports(next: Partial<Record<SheetRole, ImportedSheetFile>>): SheetBundle {
     const complete = (Object.keys(ROLE_CONFIG) as SheetRole[]).every((role) => Boolean(next[role]))
@@ -1369,9 +1501,17 @@ export default function App() {
           </span>
         </div>
         <div className="header-actions">
-          <button className="icon-button labeled" type="button" onClick={() => setUpdateOpen(true)}>
+          <button
+            className={cx('icon-button labeled update-button', updateInfo && 'has-update')}
+            type="button"
+            onClick={() => {
+              setUpdateDefaultTab(updateInfo ? 'update' : 'changelog')
+              setUpdateOpen(true)
+            }}
+          >
             <Bell size={16} />
             Updates
+            {updateInfo && <span className="update-badge">v{updateInfo.version}</span>}
           </button>
           {hasReport && (
             <button
@@ -1533,7 +1673,18 @@ export default function App() {
         </section>
       </main>
 
-      <UpdateModal open={updateOpen} onClose={() => setUpdateOpen(false)} info={updateInfo} />
+      <UpdateModal
+        open={updateOpen}
+        onClose={() => {
+          if (updateInfo) dismissedUpdateVersionRef.current = updateInfo.version
+          setUpdateOpen(false)
+        }}
+        info={updateInfo}
+        defaultTab={updateDefaultTab}
+        checking={updateChecking}
+        lastChecked={lastUpdateCheck}
+        onCheck={handleManualUpdateCheck}
+      />
 
       {hasReport && (
         <div className="export-deck" aria-hidden="true">
