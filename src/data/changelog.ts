@@ -7,6 +7,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.0.15',
+    date: '2026-07-15T15:00:00Z',
+    type: 'fix',
+    notes: [
+      'With OAC enabled, BIM Issues Detail now includes only issues opened during the reporting week, closed during the reporting week, opened and closed within that reporting week, or closed during the current week',
+      'The focused OAC activity window is shared by the HTML table, PDF export, and native PowerPoint export while manual slicer mode retains its broader issue-detail view',
+      'The first OAC detail summary card now identifies issues opened during the reporting week instead of describing the removed historical carryover population',
+      'High-resolution PDF capture now isolates and validates each page, automatically retries incomplete raster output, and prevents overlapping PDF and PowerPoint generation',
+    ],
+  },
+  {
     version: '1.0.14',
     date: '2026-07-15T13:50:00Z',
     type: 'fix',

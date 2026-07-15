@@ -355,14 +355,17 @@ function buildIssueTable(
   issues: IssueRecord[],
   currentWeek: WorkWeek,
   reportWeek: WorkWeek,
+  activityWindowOnly: boolean,
 ): IssueDetailRow[] {
   return issues
     .filter((issue) => {
       if (issue.statusKind === 'void' || !issue.createdWeek) return false
-      const createdThroughReport = compareWorkWeeks(issue.createdWeek, reportWeek) <= 0
       const openedInReport = issue.createdWeek.label === reportWeek.label
       const closedInReport = issue.closedWeek?.label === reportWeek.label
       const closedThisWeek = issue.closedWeek?.label === currentWeek.label
+      if (activityWindowOnly) return openedInReport || closedInReport || closedThisWeek
+
+      const createdThroughReport = compareWorkWeeks(issue.createdWeek, reportWeek) <= 0
       if (issue.statusKind !== 'closed') return createdThroughReport
       if (closedInReport) return true
       if (openedInReport && closedInReport) return true
@@ -375,6 +378,7 @@ function buildIssueTable(
       if (issue.statusKind === 'closed' && openedInReport && closedInReport) group = 'Opened + Closed in Report Week'
       else if (issue.statusKind === 'closed' && closedInReport) group = 'Closed in Report Week'
       else if (issue.statusKind === 'closed' && issue.closedWeek?.label === currentWeek.label) group = 'Closed This Week'
+      else if (openedInReport) group = 'Opened in Report Week'
       return {
         id: issue.id,
         subtype: issue.subtype,
@@ -549,7 +553,12 @@ export function buildReportModel(
     issueTrend: buildWeeklyTrend(issues, reportWeek),
     monthlyTrend: buildMonthlyTrend(issues, cutoffDate),
     aging: buildAging(issues, now),
-    issueTable: buildIssueTable(allIssues.filter((issue) => passesIssueFilters(issue, { ...filters, oac: false, workWeeks: [] }, reportWeek)), currentWeek, reportWeek),
+    issueTable: buildIssueTable(
+      allIssues.filter((issue) => passesIssueFilters(issue, { ...filters, oac: false, workWeeks: [] }, reportWeek)),
+      currentWeek,
+      reportWeek,
+      filters.oac,
+    ),
     electrical,
     welding,
     summary: {

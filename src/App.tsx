@@ -79,6 +79,11 @@ const EMPTY_BUNDLE: SheetBundle = {
 
 const PREVIEW_BUNDLE = buildSampleBundle()
 const ISSUE_ROWS_PER_EXPORT_SLIDE = 14
+const EXPORT_COOLDOWN_MS = 3000
+
+function waitForExportCooldown(): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, EXPORT_COOLDOWN_MS))
+}
 
 function chunkRows<T>(rows: T[], size: number): T[][] {
   if (rows.length === 0) return [[]]
@@ -927,7 +932,9 @@ function IssueTableSlide({
   }, {})
   const visibleRows = rows ?? report.issueTable
   const detailCards: Array<{ group: IssueDetailRow['group']; label: string }> = [
-    { group: 'Open Carryover', label: 'Issues Remaining Open' },
+    report.activeFilters.oac
+      ? { group: 'Opened in Report Week', label: 'Issues Opened During Report Week' }
+      : { group: 'Open Carryover', label: 'Issues Remaining Open' },
     { group: 'Closed in Report Week', label: 'Issues Closed During Report Week' },
     { group: 'Opened + Closed in Report Week', label: 'Opened + Closed Within Report Week' },
     { group: 'Closed This Week', label: 'Issues Closed During Current Week' },
@@ -1384,7 +1391,7 @@ export default function App() {
           <button
             className="button primary"
             type="button"
-            disabled={exporting || !hasReport}
+            disabled={exporting || pdfExporting || !hasReport}
             onClick={async () => {
               setExporting(true)
               try {
@@ -1392,6 +1399,7 @@ export default function App() {
               } catch (err) {
                 setError(err instanceof Error ? `PowerPoint export failed: ${err.message}` : 'PowerPoint export failed.')
               } finally {
+                await waitForExportCooldown()
                 setExporting(false)
               }
             }}
@@ -1402,7 +1410,7 @@ export default function App() {
           <button
             className="button primary pdf-button"
             type="button"
-            disabled={pdfExporting || !hasReport}
+            disabled={exporting || pdfExporting || !hasReport}
             onClick={async () => {
               setPdfExporting(true)
               try {
@@ -1410,6 +1418,7 @@ export default function App() {
               } catch (err) {
                 setError(err instanceof Error ? `PDF export failed: ${err.message}` : 'PDF export failed.')
               } finally {
+                await waitForExportCooldown()
                 setPdfExporting(false)
               }
             }}

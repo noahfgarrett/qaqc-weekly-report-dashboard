@@ -674,7 +674,9 @@ export async function exportReportDeck(report: ReportModel): Promise<void> {
   pages.forEach((rows, pageIndex) => {
     const slide = pptx.addSlide()
     addHeader(slide, `BIM Issues Detail${pages.length > 1 ? ` (${pageIndex + 1} of ${pages.length})` : ''}`, report)
-    addKpiCard(slide, 0.55, SAFE_TOP + 0.82, 2.7, 'Issues Remaining Open', compactNumber(report.issueTable.filter((row) => row.group === 'Open Carryover').length), '', C.teal)
+    const openedGroup: IssueDetailRow['group'] = report.activeFilters.oac ? 'Opened in Report Week' : 'Open Carryover'
+    const openedLabel = report.activeFilters.oac ? 'Issues Opened During Report Week' : 'Issues Remaining Open'
+    addKpiCard(slide, 0.55, SAFE_TOP + 0.82, 2.7, openedLabel, compactNumber(report.issueTable.filter((row) => row.group === openedGroup).length), '', C.teal)
     addKpiCard(slide, 3.47, SAFE_TOP + 0.82, 2.7, 'Issues Closed During Report Week', compactNumber(report.issueTable.filter((row) => row.group === 'Closed in Report Week').length), '', C.mint)
     addKpiCard(slide, 6.39, SAFE_TOP + 0.82, 2.7, 'Opened + Closed Within Report Week', compactNumber(report.issueTable.filter((row) => row.group === 'Opened + Closed in Report Week').length), '', C.cyan)
     addKpiCard(slide, 9.31, SAFE_TOP + 0.82, 2.7, 'Issues Closed During Current Week', compactNumber(report.issueTable.filter((row) => row.group === 'Closed This Week').length), '', C.amber)
