@@ -32,7 +32,7 @@ const C = {
   obsidian: '1B2530',
 }
 
-function addHeader(slide: pptxgen.Slide, title: string, report: ReportModel): void {
+function addHeader(slide: pptxgen.Slide, title: string, report: ReportModel, context = `Report Week ${report.reportWeek.label}`): void {
   slide.background = { color: C.white }
   // Slate-blue brand mark, matching the app header
   slide.addShape('roundRect', {
@@ -59,7 +59,7 @@ function addHeader(slide: pptxgen.Slide, title: string, report: ReportModel): vo
   const pills = [
     `OAC Through ${report.reportWeek.label}`,
     report.source === 'files' ? 'Imported Files' : 'Preview Layout',
-    `Report Week ${report.reportWeek.label}`,
+    context,
   ]
   pills.forEach((pill, index) => {
     slide.addShape('roundRect', {
@@ -199,6 +199,7 @@ function addKpiGroup(
   context: string,
   metrics: KpiMetric[],
   background: string,
+  showDeltas = true,
 ): void {
   slide.addShape('roundRect', {
     x,
@@ -264,27 +265,25 @@ function addKpiGroup(
       margin: 0,
       fit: 'shrink',
     })
-    slide.addText(metric.deltaLabel, {
-      x: cellX + cellW * 0.56,
-      y: cellY + 0.23,
-      w: cellW * 0.42,
-      h: 0.1,
-      fontSize: 5.6,
-      bold: true,
-      color: metricToneColor(metric),
-      align: 'right',
-      margin: 0,
-      fit: 'shrink',
-    })
+    if (showDeltas) {
+      slide.addText(metric.deltaLabel, {
+        x: cellX + cellW * 0.56,
+        y: cellY + 0.23,
+        w: cellW * 0.42,
+        h: 0.1,
+        fontSize: 5.6,
+        bold: true,
+        color: metricToneColor(metric),
+        align: 'right',
+        margin: 0,
+        fit: 'shrink',
+      })
+    }
   })
 }
 
 function maxOf(values: number[]): number {
   return Math.max(1, ...values)
-}
-
-function shortWorkWeek(label: string): string {
-  return label.replace(/^WW(\d{2})['’]\d{2}(\d{2})$/i, "$1'$2")
 }
 
 function workWeekNumber(label: string): string {
@@ -448,7 +447,7 @@ function addSimpleLine(slide: pptxgen.Slide, data: ElectricalPoint[], x: number,
   const chartY = y + 0.62
   const chartW = w - 0.78
   const chartH = h - 1.12
-  const visible = data.slice(-24)
+  const visible = data.slice(-30)
   const maxY = maxOf(visible.map((d) => d.finals))
   const step = chartW / Math.max(1, visible.length - 1)
   ;[0, 0.5, 1].forEach((ratio) => {
@@ -485,8 +484,8 @@ function addSimpleLine(slide: pptxgen.Slide, data: ElectricalPoint[], x: number,
       })
       slide.addText(String(point.issuesFound), { x: px - 0.06, y: issueY + 0.025, w: 0.12, h: 0.06, fontSize: 4.2, bold: true, color: C.white, align: 'center', margin: 0, fit: 'shrink' })
     }
-    if (index % 4 === 0 || index === visible.length - 1) {
-      slide.addText(shortWorkWeek(point.workWeek), { x: px - 0.18, y: chartY + chartH + 0.08, w: 0.36, h: 0.1, fontSize: 5, color: C.muted, align: 'center', margin: 0 })
+    if (index % 5 === 0 || index === visible.length - 1) {
+      slide.addText(workWeekNumber(point.workWeek), { x: px - 0.18, y: chartY + chartH + 0.08, w: 0.36, h: 0.1, fontSize: 5, color: C.muted, align: 'center', margin: 0 })
     }
   })
   slide.addText('INSPECTION COUNT', { x: chartX, y: chartY - 0.15, w: 1.05, h: 0.09, fontSize: 4.8, bold: true, color: C.muted, margin: 0 })
@@ -499,7 +498,7 @@ function addWelding(slide: pptxgen.Slide, data: WeldingPoint[], x: number, y: nu
   const chartY = y + 0.62
   const chartW = w - 0.9
   const chartH = h - 1.12
-  const visible = data.slice(-24)
+  const visible = data.slice(-30)
   const maxY = maxOf(visible.map((d) => d.total))
   const groupW = chartW / Math.max(visible.length, 1)
   const barW = Math.min(0.17, groupW * 0.56)
@@ -512,7 +511,6 @@ function addWelding(slide: pptxgen.Slide, data: WeldingPoint[], x: number, y: nu
   ;[0, 25, 50, 75, 100].forEach((rate) => {
     slide.addText(`${rate}%`, { x: chartX + chartW + 0.04, y: rateY(rate) - 0.05, w: 0.3, h: 0.1, fontSize: 4.8, color: C.amber, margin: 0 })
   })
-  addLine(slide, chartX, rateY(10), chartX + chartW, rateY(10), C.muted, 0.7, 'dash')
   visible.forEach((point, index) => {
     const bx = chartX + index * groupW + (groupW - barW) / 2
     const totalH = (point.total / maxY) * chartH
@@ -523,10 +521,11 @@ function addWelding(slide: pptxgen.Slide, data: WeldingPoint[], x: number, y: nu
     slide.addShape('roundRect', { x: bx, y: signedY, w: barW, h: Math.max(0.01, signedH), rectRadius: 0.02, fill: { color: C.mint }, line: { color: C.mint } })
     if (point.total > 0) slide.addText(String(point.total), { x: bx - 0.05, y: Math.max(chartY, totalY - 0.11), w: barW + 0.1, h: 0.09, fontSize: 4.5, bold: true, color: C.graphite, align: 'center', margin: 0 })
     if (point.signed > 0) slide.addText(String(point.signed), { x: bx - 0.04, y: signedH >= 0.15 ? signedY + 0.04 : signedY - 0.09, w: barW + 0.08, h: 0.08, fontSize: 4.3, bold: true, color: signedH >= 0.15 ? C.white : C.mint, align: 'center', margin: 0 })
-    if (index % 4 === 0 || index === visible.length - 1) {
-      slide.addText(shortWorkWeek(point.workWeek), { x: bx - 0.12, y: chartY + chartH + 0.08, w: barW + 0.24, h: 0.1, fontSize: 5, color: C.muted, align: 'center', margin: 0 })
+    if (index % 5 === 0 || index === visible.length - 1) {
+      slide.addText(workWeekNumber(point.workWeek), { x: bx - 0.12, y: chartY + chartH + 0.08, w: barW + 0.24, h: 0.1, fontSize: 5, color: C.muted, align: 'center', margin: 0 })
     }
   })
+  addLine(slide, chartX, rateY(10), chartX + chartW, rateY(10), C.coral, 0.9, 'dash')
   const ratePoints = visible
     .map((point, index) => ({ point, x: chartX + index * groupW + groupW / 2, y: rateY(point.signoffRate) }))
     .filter(({ point }) => point.total > 0)
@@ -535,11 +534,27 @@ function addWelding(slide: pptxgen.Slide, data: WeldingPoint[], x: number, y: nu
     const previous = ratePoints[index - 1]
     addLine(slide, previous.x, previous.y, px, py, C.amber, 1.4)
   })
-  ratePoints.forEach(({ point, x: px, y: py }, index) => {
+  const rateLabelPositions = ratePoints.reduce<Array<(typeof ratePoints)[number] & { labelY: number }>>((positions, item, index) => {
+    const above = Math.max(chartY, item.y - 0.13)
+    const below = Math.min(chartY + chartH - 0.08, item.y + 0.05)
+    let labelY = index % 2 === 0 ? above : below
+    const totalY = chartY + chartH - (item.point.total / maxY) * chartH
+    const issueY = Math.max(chartY, totalY - 0.2)
+    const reservedY = item.point.issuesCreated > 0 ? issueY : Math.max(chartY, totalY - 0.11)
+    if (Math.abs(labelY - reservedY) < 0.14) labelY = labelY === above ? below : above
+    const previous = positions[positions.length - 1]
+    if (previous && Math.abs(item.x - previous.x) < 0.34 && Math.abs(labelY - previous.labelY) < 0.1) {
+      labelY = labelY === above ? below : above
+    }
+    positions.push({ ...item, labelY })
+    return positions
+  }, [])
+  rateLabelPositions.forEach(({ point, x: px, y: py, labelY }) => {
     slide.addShape('ellipse', { x: px - 0.025, y: py - 0.025, w: 0.05, h: 0.05, fill: { color: C.amber }, line: { color: C.white, width: 0.5 } })
-    const labelY = index % 2 === 0 ? Math.max(chartY, py - 0.13) : Math.min(chartY + chartH - 0.08, py + 0.05)
+    slide.addShape('roundRect', { x: px - 0.15, y: labelY - 0.015, w: 0.3, h: 0.11, rectRadius: 0.025, fill: { color: C.white, transparency: 4 }, line: { color: C.amber, transparency: 55, width: 0.4 } })
     slide.addText(percent(point.signoffRate, 0), { x: px - 0.15, y: labelY, w: 0.3, h: 0.09, fontSize: 4.5, bold: true, color: C.amber, align: 'center', margin: 0 })
   })
+  slide.addText('10% baseline', { x: chartX + chartW + 0.02, y: rateY(10) - 0.09, w: 0.4, h: 0.08, fontSize: 4.2, bold: true, color: C.coral, margin: 0, fit: 'shrink' })
   visible.forEach((point, index) => {
     if (point.issuesCreated <= 0) return
     const px = chartX + index * groupW + groupW / 2
@@ -568,7 +583,16 @@ function addIssueTable(slide: pptxgen.Slide, rows: IssueDetailRow[]): void {
     ['Due Date', 0.72],
   ] as const
   let cursor = x
-  slide.addShape('roundRect', { x, y: y - 0.05, w: 12.25, h: 4.25, rectRadius: 0.1, fill: { color: C.white }, line: { color: C.faint } })
+  slide.addShape('roundRect', {
+    x,
+    y: y - 0.05,
+    w: 12.25,
+    h: 4.25,
+    rectRadius: 0.1,
+    fill: { color: C.white },
+    line: { color: C.faint },
+    shadow: { type: 'outer', color: 'CBD5E1', opacity: 0.16, blur: 1, angle: 45, offset: 1 },
+  })
   slide.addShape('roundRect', { x, y, w: 12.25, h: 0.3, rectRadius: 0.06, fill: { color: C.panel }, line: { color: C.faint } })
   columns.forEach(([label, width]) => {
     slide.addText(label.toUpperCase(), { x: cursor + 0.05, y: y + 0.04, w: width - 0.1, h: 0.12, fontSize: 5.6, bold: true, color: C.muted, charSpacing: 0.4, margin: 0, fit: 'shrink' })
@@ -604,7 +628,7 @@ function addIssueTable(slide: pptxgen.Slide, rows: IssueDetailRow[]): void {
   })
 }
 
-function issuePages(rows: IssueDetailRow[], size = 16): IssueDetailRow[][] {
+function issuePages(rows: IssueDetailRow[], size = 14): IssueDetailRow[][] {
   if (rows.length === 0) return [[]]
   return Array.from({ length: Math.ceil(rows.length / size) }, (_, index) => rows.slice(index * size, (index + 1) * size))
 }
@@ -646,7 +670,7 @@ export async function exportReportDeck(report: ReportModel): Promise<void> {
   const kpiGroupGap = 0.18
   const kpiGroupW = (12.23 - kpiGroupGap) / 2
   addKpiGroup(slide1, 0.55, kpiY, kpiGroupW, 1.62, 'PROJECT TO DATE', `Through ${report.reportWeek.label}`, projectMetrics, C.surface)
-  addKpiGroup(slide1, 0.55 + kpiGroupW + kpiGroupGap, kpiY, kpiGroupW, 1.62, report.reportWeek.label, '', weekMetrics, C.panel)
+  addKpiGroup(slide1, 0.55 + kpiGroupW + kpiGroupGap, kpiY, kpiGroupW, 1.62, report.reportWeek.label, '', weekMetrics, C.panel, false)
   addIssueTrend(slide1, report.issueTrend, 0.55, SAFE_TOP + 1.86, 12.23, 1.82)
   addMonthly(slide1, report.monthlyTrend, 0.55, SAFE_TOP + 3.9, 7.85, 1.88)
   addAging(slide1, report.aging, 8.62, SAFE_TOP + 3.9, 4.16, 1.88)
@@ -656,20 +680,20 @@ export async function exportReportDeck(report: ReportModel): Promise<void> {
   pages.forEach((rows, pageIndex) => {
     const slide = pptx.addSlide()
     addHeader(slide, `BIM Issues Detail${pages.length > 1 ? ` (${pageIndex + 1} of ${pages.length})` : ''}`, report)
-    addKpiCard(slide, 0.55, SAFE_TOP + 0.82, 2.7, 'Open Carryover', compactNumber(report.issueTable.filter((row) => row.group === 'Open Carryover').length), '', C.teal)
-    addKpiCard(slide, 3.47, SAFE_TOP + 0.82, 2.7, 'Closed in Report Week', compactNumber(report.issueTable.filter((row) => row.group === 'Closed in Report Week' || row.group === 'Opened + Closed in Report Week').length), '', C.mint)
-    addKpiCard(slide, 6.39, SAFE_TOP + 0.82, 2.7, 'Opened + Closed', compactNumber(report.issueTable.filter((row) => row.group === 'Opened + Closed in Report Week').length), '', C.cyan)
-    addKpiCard(slide, 9.31, SAFE_TOP + 0.82, 2.7, 'Closed This Week', compactNumber(report.issueTable.filter((row) => row.group === 'Closed This Week').length), '', C.amber)
+    addKpiCard(slide, 0.55, SAFE_TOP + 0.82, 2.7, 'Issues Remaining Open', compactNumber(report.issueTable.filter((row) => row.group === 'Open Carryover').length), '', C.teal)
+    addKpiCard(slide, 3.47, SAFE_TOP + 0.82, 2.7, 'Issues Closed During Report Week', compactNumber(report.issueTable.filter((row) => row.group === 'Closed in Report Week').length), '', C.mint)
+    addKpiCard(slide, 6.39, SAFE_TOP + 0.82, 2.7, 'Opened + Closed Within Report Week', compactNumber(report.issueTable.filter((row) => row.group === 'Opened + Closed in Report Week').length), '', C.cyan)
+    addKpiCard(slide, 9.31, SAFE_TOP + 0.82, 2.7, 'Issues Closed During Current Week', compactNumber(report.issueTable.filter((row) => row.group === 'Closed This Week').length), '', C.amber)
     addIssueTable(slide, rows)
     addFooter(slide, report)
   })
 
   const fieldSlide = pptx.addSlide()
-  addHeader(fieldSlide, 'Inspections & Welding Signoffs', report)
+  addHeader(fieldSlide, 'Inspections & Welding Signoffs', report, `Current Week ${report.currentWeek.label}`)
   const chips = [
     ['Electrical Finals', compactNumber(report.summary.electricalFinals), deltaLabel(report.summary.deltas.electricalFinals)],
     ['Electrical Issues Found', compactNumber(report.summary.electricalIssuesFound), deltaLabel(report.summary.deltas.electricalIssuesFound)],
-    ['Welds Checked', compactNumber(report.summary.weldsChecked), deltaLabel(report.summary.deltas.weldsChecked)],
+    ['Total Welds', compactNumber(report.summary.weldsChecked), deltaLabel(report.summary.deltas.weldsChecked)],
     ['Welds Signed', compactNumber(report.summary.weldsSigned), deltaLabel(report.summary.deltas.weldsSigned)],
   ]
   chips.forEach(([label, value, delta], index) => addKpiCard(fieldSlide, 0.55 + index * 2.48, SAFE_TOP + 0.82, 2.22, label, value, delta, index === 1 ? C.amber : C.teal))

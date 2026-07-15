@@ -7,6 +7,21 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.0.13',
+    date: '2026-07-15T13:25:31Z',
+    type: 'feature',
+    notes: [
+      'The report-week KPI panel now keeps its values and sparklines clean by omitting previous-week comparison labels',
+      'Redundant Issues / Week and Remaining Open captions were removed from the Issues by Work Week plot while retaining both numeric scales and the legend',
+      'Open-issue comparisons now use red for increases, green for decreases, and neutral styling when unchanged',
+      'BIM issue exports now paginate at complete 14-row boundaries so an issue never splits across PDF or PowerPoint slides',
+      'BIM detail summary cards use clearer descriptions, including Issues Remaining Open and explicit report-week/current-week closure labels',
+      'Electrical and Welding charts now show rolling 30-week windows with compact WW## axes and current work-week context in the slide header',
+      'Welding now uses Total Welds terminology, collision-aware data labels, and a front-layer dotted red 10% baseline with an inline axis label',
+      'Detail cards, field cards, chart panels, and the BIM issue table now use consistent restrained drop shadows',
+    ],
+  },
+  {
     version: '1.0.11',
     date: '2026-07-15T13:00:55Z',
     type: 'feature',

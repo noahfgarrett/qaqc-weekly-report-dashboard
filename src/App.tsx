@@ -78,7 +78,7 @@ const EMPTY_BUNDLE: SheetBundle = {
 }
 
 const PREVIEW_BUNDLE = buildSampleBundle()
-const ISSUE_ROWS_PER_EXPORT_SLIDE = 16
+const ISSUE_ROWS_PER_EXPORT_SLIDE = 14
 
 function chunkRows<T>(rows: T[], size: number): T[][] {
   if (rows.length === 0) return [[]]
@@ -253,7 +253,7 @@ function Sparkline({ data, hero }: { data: number[]; hero?: boolean }) {
   )
 }
 
-function KpiTile({ metric, hero }: { metric: KpiMetric; hero?: boolean }) {
+function KpiTile({ metric, hero, hideDelta }: { metric: KpiMetric; hero?: boolean; hideDelta?: boolean }) {
   const Icon = metric.icon
   const toneClass = metric.tone === 'good' ? 'good' : metric.tone === 'warn' ? 'warn' : metric.tone === 'bad' ? 'bad' : ''
   const arrow = metric.delta > 0.0001 ? '▲' : metric.delta < -0.0001 ? '▼' : ''
@@ -268,10 +268,12 @@ function KpiTile({ metric, hero }: { metric: KpiMetric; hero?: boolean }) {
       </div>
       <div className="kpi-value-row">
         <strong>{metric.value}</strong>
-        <span className={cx('kpi-delta', toneClass)}>
-          {arrow && <span aria-hidden="true">{arrow}</span>}
-          {deltaText}
-        </span>
+        {!hideDelta && (
+          <span className={cx('kpi-delta', toneClass)}>
+            {arrow && <span aria-hidden="true">{arrow}</span>}
+            {deltaText}
+          </span>
+        )}
       </div>
       {metric.spark && <Sparkline data={metric.spark} hero={hero} />}
     </article>
@@ -306,7 +308,7 @@ function KpiZone({ report }: { report: ReturnType<typeof buildReportModel> }) {
         <div className="kpi-group-body">
           {KPI_GROUPS.week.map((id) => {
             const metric = byId.get(id)
-            return metric ? <KpiTile key={id} metric={metric} /> : null
+            return metric ? <KpiTile key={id} metric={metric} hideDelta /> : null
           })}
         </div>
       </section>
@@ -429,10 +431,6 @@ function chartValue(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(1)
 }
 
-function shortWorkWeek(label: string): string {
-  return label.replace(/^WW(\d{2})['’]\d{2}(\d{2})$/i, "$1'$2")
-}
-
 function workWeekNumber(label: string): string {
   const match = label.match(/^WW(\d{1,2})/i)
   return match ? `WW${match[1].padStart(2, '0')}` : label
@@ -507,9 +505,6 @@ function RangeChart({ data }: { data: WeeklyIssuePoint[] }) {
         {lineScale.ticks.map((tick) => (
           <text key={`line-axis-${tick}`} className="tick-label remaining-axis-label" x={width - pad.r + 9} y={toYLine(tick) + 4}>{chartValue(tick)}</text>
         ))}
-        <text className="axis-title" x={pad.l} y={pad.t - 3}>ISSUES / WEEK</text>
-        <text className="axis-title remaining-axis-label" x={width - pad.r} y={pad.t - 3} textAnchor="end">REMAINING OPEN</text>
-
         {visible.map((point, index) => {
           const isLatest = index === visible.length - 1
           return (
@@ -664,7 +659,7 @@ function AgingChart({ data }: { data: AgingBucket[] }) {
 
 function ElectricalChart({ data }: { data: ElectricalPoint[] }) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
-  const visible = data.slice(-24)
+  const visible = data.slice(-30)
   const { max, ticks } = niceScale(Math.max(1, ...visible.map((point) => point.finals)))
   const width = 620
   const height = 360
@@ -707,9 +702,9 @@ function ElectricalChart({ data }: { data: ElectricalPoint[] }) {
                   <text textAnchor="middle" y="3">{point.issuesFound}</text>
                 </g>
               )}
-              {(index % 4 === 0 || index === visible.length - 1) && (
+              {(index % 5 === 0 || index === visible.length - 1) && (
                 <text className="week-axis-label" x={x} y={height - 22} textAnchor="middle">
-                  {shortWorkWeek(point.workWeek)}
+                  {workWeekNumber(point.workWeek)}
                 </text>
               )}
             </g>
@@ -729,7 +724,7 @@ function ElectricalChart({ data }: { data: ElectricalPoint[] }) {
 
 function WeldingChart({ data }: { data: WeldingPoint[] }) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
-  const visible = data.slice(-24)
+  const visible = data.slice(-30)
   const { max, ticks } = niceScale(Math.max(1, ...visible.map((point) => point.total)))
   const width = 620
   const height = 360
@@ -748,6 +743,21 @@ function WeldingChart({ data }: { data: WeldingPoint[] }) {
       y: toRateY(point.signoffRate),
     }))
     .filter(({ point }) => point.total > 0)
+  const rateLabelPositions = ratePoints.reduce<Array<(typeof ratePoints)[number] & { labelY: number }>>((positions, item, index) => {
+    const above = Math.max(pad.t + 10, item.y - 10)
+    const below = Math.min(pad.t + chartH - 5, item.y + 17)
+    let labelY = index % 2 === 0 ? above : below
+    const totalY = toY(item.point.total)
+    const issueY = Math.max(pad.t + 10, totalY - 20)
+    const reservedY = item.point.issuesCreated > 0 ? issueY : Math.max(pad.t + 9, totalY - 5)
+    if (Math.abs(labelY - reservedY) < 15) labelY = labelY === above ? below : above
+    const previous = positions[positions.length - 1]
+    if (previous && Math.abs(item.x - previous.x) < 32 && Math.abs(labelY - previous.labelY) < 11) {
+      labelY = labelY === above ? below : above
+    }
+    positions.push({ ...item, labelY })
+    return positions
+  }, [])
   const hovered = hoveredIndex === null ? null : visible[hoveredIndex]
   return (
     <div className="chart-shell field-chart-shell">
@@ -761,7 +771,6 @@ function WeldingChart({ data }: { data: WeldingPoint[] }) {
         {rateTicks.map((tick) => (
           <text className="tick-label signoff-axis-label" key={tick} x={width - pad.r + 9} y={toRateY(tick) + 4}>{tick}%</text>
         ))}
-        <line className="signoff-baseline" x1={pad.l} x2={width - pad.r} y1={toRateY(10)} y2={toRateY(10)} />
         {visible.map((point, index) => {
           const x = pad.l + index * group + (group - barW) / 2
           const totalH = (point.total / max) * chartH
@@ -786,31 +795,28 @@ function WeldingChart({ data }: { data: WeldingPoint[] }) {
                   {point.signed}
                 </text>
               )}
-              {(index % 4 === 0 || index === visible.length - 1) && (
+              {(index % 5 === 0 || index === visible.length - 1) && (
                 <text className="week-axis-label" x={pad.l + index * group + group / 2} y={height - 22} textAnchor="middle">
-                  {shortWorkWeek(point.workWeek)}
+                  {workWeekNumber(point.workWeek)}
                 </text>
               )}
             </g>
           )
         })}
+        <line className="signoff-baseline" x1={pad.l} x2={width - pad.r} y1={toRateY(10)} y2={toRateY(10)} />
         <path className="signoff-rate-line" d={smoothPath(ratePoints)} fill="none" />
-        {ratePoints.map(({ point, x, y }, index) => {
-          const labelY = index % 2 === 0
-            ? Math.max(pad.t + 10, y - 10)
-            : Math.min(pad.t + chartH - 5, y + 17)
-          return (
-            <g key={`rate-${point.workWeek}`}>
-              <circle className="signoff-rate-dot" cx={x} cy={y} r="3.5" />
-              <text className="signoff-rate-label" x={x} y={labelY} textAnchor="middle">{percent(point.signoffRate, 0)}</text>
-            </g>
-          )
-        })}
+        {rateLabelPositions.map(({ point, x, y, labelY }) => (
+          <g key={`rate-${point.workWeek}`}>
+            <circle className="signoff-rate-dot" cx={x} cy={y} r="3.5" />
+            <rect className="signoff-rate-label-bg" x={x - 14} y={labelY - 9} width="28" height="12" rx="4" />
+            <text className="signoff-rate-label" x={x} y={labelY} textAnchor="middle">{percent(point.signoffRate, 0)}</text>
+          </g>
+        ))}
         {visible.map((point, index) => {
           if (point.issuesCreated <= 0) return null
           const x = pad.l + index * group + group / 2
           const totalY = toY(point.total)
-          const issueY = Math.max(pad.t + 10, totalY - 18)
+          const issueY = Math.max(pad.t + 10, totalY - 20)
           return (
             <g className="issue-badge" key={`issue-${point.workWeek}`} transform={`translate(${x} ${issueY})`}>
               <circle r="8" />
@@ -818,6 +824,7 @@ function WeldingChart({ data }: { data: WeldingPoint[] }) {
             </g>
           )
         })}
+        <text className="signoff-baseline-label" x={width - 4} y={toRateY(10) - 5} textAnchor="end">10% baseline</text>
         <text className="axis-title" x={12} y={pad.t + chartH / 2} textAnchor="middle" transform={`rotate(-90 12 ${pad.t + chartH / 2})`}>Weld count</text>
         <text className="axis-title signoff-axis-label" x={width - 10} y={pad.t + chartH / 2} textAnchor="middle" transform={`rotate(90 ${width - 10} ${pad.t + chartH / 2})`}>Sign-off rate</text>
       </svg>
@@ -920,6 +927,12 @@ function IssueTableSlide({
     return acc
   }, {})
   const visibleRows = rows ?? report.issueTable
+  const detailCards: Array<{ group: IssueDetailRow['group']; label: string }> = [
+    { group: 'Open Carryover', label: 'Issues Remaining Open' },
+    { group: 'Closed in Report Week', label: 'Issues Closed During Report Week' },
+    { group: 'Opened + Closed in Report Week', label: 'Opened + Closed Within Report Week' },
+    { group: 'Closed This Week', label: 'Issues Closed During Current Week' },
+  ]
   return (
     <SlideShell
       title="BIM Issues Detail"
@@ -928,14 +941,14 @@ function IssueTableSlide({
       meta={pageCount > 1 ? `Page ${pageIndex + 1} of ${pageCount} | ${report.issueTable.length} issues` : `${report.issueTable.length} issues`}
     >
       <div className="detail-metrics">
-        {['Open Carryover', 'Closed in Report Week', 'Opened + Closed in Report Week', 'Closed This Week'].map((group) => (
+        {detailCards.map(({ group, label }) => (
           <div className="metric-chip" key={group}>
             <strong>{compactNumber(groupCounts[group] ?? 0)}</strong>
-            <span>{group.replace(' in Report Week', '')}</span>
+            <span>{label}</span>
           </div>
         ))}
       </div>
-      <div className="issue-table-wrap">
+      <div className={cx('issue-table-wrap', exportable && 'export-page')}>
         <table className="issue-table">
           <thead>
             <tr>
@@ -971,11 +984,16 @@ function FieldSlide({ report, exportable }: { report: ReturnType<typeof buildRep
   const chips = [
     ['Electrical Finals', compactNumber(report.summary.electricalFinals), deltaLabel(report.summary.deltas.electricalFinals), ClipboardCheck],
     ['Electrical Issues Found', compactNumber(report.summary.electricalIssuesFound), deltaLabel(report.summary.deltas.electricalIssuesFound), AlertCircle],
-    ['Welds Checked', compactNumber(report.summary.weldsChecked), deltaLabel(report.summary.deltas.weldsChecked), Flame],
+    ['Total Welds', compactNumber(report.summary.weldsChecked), deltaLabel(report.summary.deltas.weldsChecked), Flame],
     ['Welds Signed', compactNumber(report.summary.weldsSigned), deltaLabel(report.summary.deltas.weldsSigned), CheckCircle2],
   ] as const
   return (
-    <SlideShell title="Inspections & Welding Signoffs" icon={<ClipboardCheck size={18} />} exportable={exportable}>
+    <SlideShell
+      title="Inspections & Welding Signoffs"
+      icon={<ClipboardCheck size={18} />}
+      exportable={exportable}
+      meta={`Current ${report.currentWeek.label}`}
+    >
       <div className="field-chip-row">
         {chips.map(([label, value, delta, Icon]) => (
           <article className="field-chip" key={label}>

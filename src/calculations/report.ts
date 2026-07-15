@@ -496,11 +496,29 @@ export function buildReportModel(
   const sorsSeries = sparkWeeks.map((week) => inspections.filter((row) => row.workWeek?.label === week.label && includesPhase(row.phase, 'SOR')).length)
 
   const kpis: KpiMetric[] = [
-    makeMetric('total-opened', 'Total Issues Opened', totalOpened, previousTotalOpened, ClipboardList, 'neutral', compactNumber, cumOpenedSeries),
+    makeMetric(
+      'total-opened',
+      'Total Issues Opened',
+      totalOpened,
+      previousTotalOpened,
+      ClipboardList,
+      totalOpened > previousTotalOpened ? 'bad' : totalOpened < previousTotalOpened ? 'good' : 'neutral',
+      compactNumber,
+      cumOpenedSeries,
+    ),
     makeMetric('total-closed', 'Total Issues Closed', totalClosed, previousTotalClosed, CheckCircle2, 'good', compactNumber, cumClosedSeries),
     makeMetric('opened-week', 'Issues Opened', openedWeek, openedPreviousWeek, TrendingUp, openedWeek > openedPreviousWeek ? 'warn' : 'neutral', compactNumber, openedWeekSeries),
     makeMetric('closed-week', 'Issues Closed', closedWeek, closedPreviousWeek, TrendingDown, closedWeek >= closedPreviousWeek ? 'good' : 'neutral', compactNumber, closedWeekSeries),
-    makeMetric('remaining-open', 'Issues Remaining Open', remaining, previousRemaining, AlertCircle, remaining > previousRemaining ? 'warn' : 'good', compactNumber, remainingSeries),
+    makeMetric(
+      'remaining-open',
+      'Issues Remaining Open',
+      remaining,
+      previousRemaining,
+      AlertCircle,
+      remaining > previousRemaining ? 'bad' : remaining < previousRemaining ? 'good' : 'neutral',
+      compactNumber,
+      remainingSeries,
+    ),
     makeMetric('inspections', 'Inspections', inspectionsWeek, inspectionsPrevious, ClipboardCheck, 'good', compactNumber, inspectionsSeries),
     makeMetric('sors', 'SORs', sorsWeek, sorsPrevious, Wrench, sorsWeek > sorsPrevious ? 'warn' : 'neutral', compactNumber, sorsSeries),
     makeMetric('closure-rate', 'Closure Rate', closureRate, previousClosureRate, Gauge, 'good', (value) => percent(value, 1), closureRateSeries),

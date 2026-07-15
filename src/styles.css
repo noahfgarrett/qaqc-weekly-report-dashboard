@@ -1326,15 +1326,30 @@ select:disabled {
   stroke-width: 2;
 }
 
+.signoff-rate-label-bg {
+  fill: rgba(255, 255, 255, 0.94);
+  stroke: rgba(194, 135, 11, 0.42);
+  stroke-width: 0.75;
+}
+
 .signoff-rate-label,
 .signoff-axis-label {
   fill: var(--c-remaining);
 }
 
 .signoff-baseline {
-  stroke: var(--faint);
+  stroke: var(--bad);
   stroke-dasharray: 5 4;
-  stroke-width: 1.25;
+  stroke-width: 1.5;
+}
+
+.signoff-baseline-label {
+  fill: var(--bad);
+  font-size: 8px;
+  font-weight: 750;
+  paint-order: stroke;
+  stroke: var(--white);
+  stroke-width: 3px;
 }
 
 .electrical-area {
@@ -1495,7 +1510,7 @@ select:disabled {
 }
 
 .legend-baseline::before {
-  background: repeating-linear-gradient(90deg, var(--faint) 0 5px, transparent 5px 8px);
+  background: repeating-linear-gradient(90deg, var(--bad) 0 5px, transparent 5px 8px);
   height: 2px;
 }
 
@@ -1652,7 +1667,7 @@ select:disabled {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 12px;
-  box-shadow: var(--e1);
+  box-shadow: var(--e2);
   padding: 12px 14px;
 }
 
@@ -1741,11 +1756,15 @@ select:disabled {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 14px;
-  box-shadow: var(--e1);
+  box-shadow: var(--e2);
   flex: 1 1 auto;
   margin-top: 12px;
   min-height: 0;
   overflow: auto;
+}
+
+.issue-table-wrap.export-page {
+  overflow: hidden;
 }
 
 .issue-table {
