@@ -492,7 +492,7 @@ function addSimpleLine(slide: pptxgen.Slide, data: ElectricalPoint[], x: number,
   slide.addText('Work Week Observed', { x: x + 2.2, y: y + h - 0.18, w: 1.4, h: 0.1, fontSize: 5.5, color: C.muted, margin: 0 })
 }
 
-function addWelding(slide: pptxgen.Slide, data: WeldingPoint[], x: number, y: number, w: number, h: number): void {
+function addWelding(slide: pptxgen.Slide, data: WeldingPoint[], reportWeek: string, x: number, y: number, w: number, h: number): void {
   addPanel(slide, x, y, w, h, 'Welding Signoffs by Work Week')
   const chartX = x + 0.45
   const chartY = y + 0.62
@@ -534,26 +534,20 @@ function addWelding(slide: pptxgen.Slide, data: WeldingPoint[], x: number, y: nu
     const previous = ratePoints[index - 1]
     addLine(slide, previous.x, previous.y, px, py, C.amber, 1.4)
   })
-  const rateLabelPositions = ratePoints.reduce<Array<(typeof ratePoints)[number] & { labelY: number }>>((positions, item, index) => {
-    const above = Math.max(chartY, item.y - 0.13)
-    const below = Math.min(chartY + chartH - 0.08, item.y + 0.05)
-    let labelY = index % 2 === 0 ? above : below
-    const totalY = chartY + chartH - (item.point.total / maxY) * chartH
-    const issueY = Math.max(chartY, totalY - 0.2)
-    const reservedY = item.point.issuesCreated > 0 ? issueY : Math.max(chartY, totalY - 0.11)
-    if (Math.abs(labelY - reservedY) < 0.14) labelY = labelY === above ? below : above
-    const previous = positions[positions.length - 1]
-    if (previous && Math.abs(item.x - previous.x) < 0.34 && Math.abs(labelY - previous.labelY) < 0.1) {
-      labelY = labelY === above ? below : above
-    }
-    positions.push({ ...item, labelY })
-    return positions
-  }, [])
-  rateLabelPositions.forEach(({ point, x: px, y: py, labelY }) => {
+  ratePoints.forEach(({ x: px, y: py }) => {
     slide.addShape('ellipse', { x: px - 0.025, y: py - 0.025, w: 0.05, h: 0.05, fill: { color: C.amber }, line: { color: C.white, width: 0.5 } })
-    slide.addShape('roundRect', { x: px - 0.15, y: labelY - 0.015, w: 0.3, h: 0.11, rectRadius: 0.025, fill: { color: C.white, transparency: 4 }, line: { color: C.amber, transparency: 55, width: 0.4 } })
-    slide.addText(percent(point.signoffRate, 0), { x: px - 0.15, y: labelY, w: 0.3, h: 0.09, fontSize: 4.5, bold: true, color: C.amber, align: 'center', margin: 0 })
   })
+  const reportRatePoint = ratePoints.find(({ point }) => point.workWeek === reportWeek)
+  if (reportRatePoint) {
+    const above = Math.max(chartY, reportRatePoint.y - 0.13)
+    const below = Math.min(chartY + chartH - 0.08, reportRatePoint.y + 0.05)
+    const totalY = chartY + chartH - (reportRatePoint.point.total / maxY) * chartH
+    const issueY = Math.max(chartY, totalY - 0.2)
+    const reservedY = reportRatePoint.point.issuesCreated > 0 ? issueY : Math.max(chartY, totalY - 0.11)
+    const labelY = Math.abs(above - reservedY) < 0.14 ? below : above
+    slide.addShape('roundRect', { x: reportRatePoint.x - 0.15, y: labelY - 0.015, w: 0.3, h: 0.11, rectRadius: 0.025, fill: { color: C.white, transparency: 4 }, line: { color: C.amber, transparency: 55, width: 0.4 } })
+    slide.addText(percent(reportRatePoint.point.signoffRate, 0), { x: reportRatePoint.x - 0.15, y: labelY, w: 0.3, h: 0.09, fontSize: 4.5, bold: true, color: C.amber, align: 'center', margin: 0 })
+  }
   slide.addText('10% baseline', { x: chartX + chartW + 0.02, y: rateY(10) - 0.09, w: 0.4, h: 0.08, fontSize: 4.2, bold: true, color: C.coral, margin: 0, fit: 'shrink' })
   visible.forEach((point, index) => {
     if (point.issuesCreated <= 0) return
@@ -708,7 +702,7 @@ export async function exportReportDeck(report: ReportModel): Promise<void> {
     deltaLabel(report.summary.deltas.reportWeekSignoffRate),
   )
   addSimpleLine(fieldSlide, report.electrical, 0.55, SAFE_TOP + 2.08, 5.95, 3.74)
-  addWelding(fieldSlide, report.welding, 6.82, SAFE_TOP + 2.08, 5.95, 3.74)
+  addWelding(fieldSlide, report.welding, report.reportWeek.label, 6.82, SAFE_TOP + 2.08, 5.95, 3.74)
   addFooter(fieldSlide, report)
 
   const output = await pptx.write({ outputType: 'blob', compression: true })

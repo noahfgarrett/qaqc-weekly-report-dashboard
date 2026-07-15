@@ -722,7 +722,7 @@ function ElectricalChart({ data }: { data: ElectricalPoint[] }) {
   )
 }
 
-function WeldingChart({ data }: { data: WeldingPoint[] }) {
+function WeldingChart({ data, reportWeek }: { data: WeldingPoint[]; reportWeek: string }) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
   const visible = data.slice(-30)
   const { max, ticks } = niceScale(Math.max(1, ...visible.map((point) => point.total)))
@@ -743,21 +743,16 @@ function WeldingChart({ data }: { data: WeldingPoint[] }) {
       y: toRateY(point.signoffRate),
     }))
     .filter(({ point }) => point.total > 0)
-  const rateLabelPositions = ratePoints.reduce<Array<(typeof ratePoints)[number] & { labelY: number }>>((positions, item, index) => {
-    const above = Math.max(pad.t + 10, item.y - 10)
-    const below = Math.min(pad.t + chartH - 5, item.y + 17)
-    let labelY = index % 2 === 0 ? above : below
-    const totalY = toY(item.point.total)
+  const reportRatePoint = ratePoints.find(({ point }) => point.workWeek === reportWeek)
+  const reportRateLabelY = (() => {
+    if (!reportRatePoint) return null
+    const above = Math.max(pad.t + 10, reportRatePoint.y - 10)
+    const below = Math.min(pad.t + chartH - 5, reportRatePoint.y + 17)
+    const totalY = toY(reportRatePoint.point.total)
     const issueY = Math.max(pad.t + 10, totalY - 20)
-    const reservedY = item.point.issuesCreated > 0 ? issueY : Math.max(pad.t + 9, totalY - 5)
-    if (Math.abs(labelY - reservedY) < 15) labelY = labelY === above ? below : above
-    const previous = positions[positions.length - 1]
-    if (previous && Math.abs(item.x - previous.x) < 32 && Math.abs(labelY - previous.labelY) < 11) {
-      labelY = labelY === above ? below : above
-    }
-    positions.push({ ...item, labelY })
-    return positions
-  }, [])
+    const reservedY = reportRatePoint.point.issuesCreated > 0 ? issueY : Math.max(pad.t + 9, totalY - 5)
+    return Math.abs(above - reservedY) < 15 ? below : above
+  })()
   const hovered = hoveredIndex === null ? null : visible[hoveredIndex]
   return (
     <div className="chart-shell field-chart-shell">
@@ -805,11 +800,15 @@ function WeldingChart({ data }: { data: WeldingPoint[] }) {
         })}
         <line className="signoff-baseline" x1={pad.l} x2={width - pad.r} y1={toRateY(10)} y2={toRateY(10)} />
         <path className="signoff-rate-line" d={smoothPath(ratePoints)} fill="none" />
-        {rateLabelPositions.map(({ point, x, y, labelY }) => (
+        {ratePoints.map(({ point, x, y }) => (
           <g key={`rate-${point.workWeek}`}>
             <circle className="signoff-rate-dot" cx={x} cy={y} r="3.5" />
-            <rect className="signoff-rate-label-bg" x={x - 14} y={labelY - 9} width="28" height="12" rx="4" />
-            <text className="signoff-rate-label" x={x} y={labelY} textAnchor="middle">{percent(point.signoffRate, 0)}</text>
+            {point.workWeek === reportWeek && reportRateLabelY !== null && (
+              <>
+                <rect className="signoff-rate-label-bg" x={x - 14} y={reportRateLabelY - 9} width="28" height="12" rx="4" />
+                <text className="signoff-rate-label" x={x} y={reportRateLabelY} textAnchor="middle">{percent(point.signoffRate, 0)}</text>
+              </>
+            )}
           </g>
         ))}
         {visible.map((point, index) => {
@@ -1045,7 +1044,7 @@ function FieldSlide({ report, exportable }: { report: ReturnType<typeof buildRep
             <span className="legend-issue">Issue created</span>
             <span className="legend-baseline">10% baseline</span>
           </div>
-          <WeldingChart data={report.welding} />
+          <WeldingChart data={report.welding} reportWeek={report.reportWeek.label} />
         </article>
       </div>
     </SlideShell>

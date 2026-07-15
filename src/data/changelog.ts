@@ -7,6 +7,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.0.14',
+    date: '2026-07-15T13:50:00Z',
+    type: 'fix',
+    notes: [
+      'The Welding Signoffs chart now labels only the active reporting-week sign-off percentage while retaining the complete historical line and hover details',
+      'The same focused reporting-week label is used in the native PowerPoint export for a cleaner field-report chart',
+    ],
+  },
+  {
     version: '1.0.13',
     date: '2026-07-15T13:25:31Z',
     type: 'feature',
