@@ -891,6 +891,7 @@ select:disabled {
 .kpi-group.this-week {
   border: 1px solid var(--border);
   border-radius: 14px;
+  box-shadow: var(--e1);
   padding: 6px 12px 8px;
 }
 
@@ -1114,7 +1115,7 @@ select:disabled {
   background: var(--white);
   border: 1px solid var(--border);
   border-radius: 14px;
-  box-shadow: var(--e1);
+  box-shadow: var(--e2);
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -1282,6 +1283,60 @@ select:disabled {
   stroke-width: 2;
 }
 
+.electrical-point-label,
+.weld-total-label,
+.weld-signed-label,
+.signoff-rate-label {
+  font-size: 8.5px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 750;
+  paint-order: stroke;
+  stroke: var(--white);
+  stroke-width: 3px;
+}
+
+.electrical-point-label {
+  fill: var(--accent-strong);
+}
+
+.weld-total-label {
+  fill: var(--ink-2);
+}
+
+.weld-signed-label {
+  fill: var(--c-closed);
+}
+
+.weld-signed-label.inside {
+  fill: var(--white);
+  paint-order: normal;
+  stroke: none;
+}
+
+.signoff-rate-line {
+  stroke: var(--c-remaining);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2.25;
+}
+
+.signoff-rate-dot {
+  fill: var(--c-remaining);
+  stroke: var(--white);
+  stroke-width: 2;
+}
+
+.signoff-rate-label,
+.signoff-axis-label {
+  fill: var(--c-remaining);
+}
+
+.signoff-baseline {
+  stroke: var(--faint);
+  stroke-dasharray: 5 4;
+  stroke-width: 1.25;
+}
+
 .electrical-area {
   fill: url(#electrical-area);
 }
@@ -1432,6 +1487,16 @@ select:disabled {
 .legend-track::before {
   background: var(--hairline);
   border: 1px solid var(--border);
+}
+
+.legend-signoff::before {
+  background: var(--c-remaining);
+  height: 3px;
+}
+
+.legend-baseline::before {
+  background: repeating-linear-gradient(90deg, var(--faint) 0 5px, transparent 5px 8px);
+  height: 2px;
 }
 
 .legend-issue::before {
@@ -1587,6 +1652,7 @@ select:disabled {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 12px;
+  box-shadow: var(--e1);
   padding: 12px 14px;
 }
 
@@ -1619,12 +1685,63 @@ select:disabled {
   color: var(--accent);
 }
 
+.field-chip-heading {
+  align-items: center;
+  display: flex;
+  gap: 6px;
+}
+
+.field-chip-heading span {
+  margin-top: 0;
+}
+
+.signoff-summary-chip {
+  padding: 10px 12px;
+}
+
+.signoff-summary-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 7px;
+}
+
+.signoff-summary-grid > div {
+  min-width: 0;
+}
+
+.signoff-summary-grid > div + div {
+  border-left: 1px solid var(--border);
+  padding-left: 8px;
+}
+
+.signoff-summary-grid small {
+  color: var(--muted);
+  display: block;
+  font-size: 8.5px;
+  font-weight: 650;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.signoff-summary-grid strong {
+  font-size: clamp(16px, 1.35vw, 22px);
+  margin-top: 3px;
+}
+
+.signoff-summary-grid em {
+  font-size: 9px;
+  margin-top: 2px;
+}
+
 /* ======================= Issue table ======================= */
 
 .issue-table-wrap {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 14px;
+  box-shadow: var(--e1);
   flex: 1 1 auto;
   margin-top: 12px;
   min-height: 0;

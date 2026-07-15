@@ -134,7 +134,9 @@ function normalizeInspection(row: Record<string, unknown>): InspectionRecord {
     phase: value(row, ['Inspection Phase', 'Phase of Inspection', 'Inspection Status', 'Phase']),
     workWeek: parseWorkWeek(value(row, ['Work Week Observed', 'Observed Work Week', 'Week Observed', 'WW Observed', 'Work Week', 'WW'])),
     issue: value(row, ['Issue?', 'Issues?', 'Issue Found?', 'Issues Found', 'Issue']),
-    contractor: value(row, ['Contractor', 'Responsible Contractor']) || 'Unassigned',
+    contractor: value(row, ['General Contractor'])
+      || value(row, ['Contractor', 'Responsible Contractor'])
+      || 'Unassigned',
     discipline: value(row, ['Discipline', 'Trade']) || 'Unassigned',
     subtype: value(row, ['Subtype', 'Sub Type', 'Inspection Type']) || 'Uncategorized',
   }
@@ -188,7 +190,6 @@ function passesWeldFilters(row: WeldRecord, filters: ReportFilters, reportWeek: 
     return false
   }
   return selected(row.discipline, filters.disciplines)
-    && selected(row.contractor, filters.contractors)
     && selected(row.subtype, filters.subtypes)
 }
 
@@ -333,11 +334,10 @@ function buildMonthlyTrend(issues: IssueRecord[], cutoff: Date): MonthlyIssuePoi
 }
 
 function buildAging(issues: IssueRecord[], today: Date): AgingBucket[] {
-  // Blue ordinal ramp (fresh -> old = light -> dark), validated via dataviz --ordinal.
   const buckets: AgingBucket[] = [
-    { label: '0-14 Days', count: 0, color: '#86B6EF' },
-    { label: '14-28 Days', count: 0, color: '#256ABF' },
-    { label: '28+ Days', count: 0, color: '#184F95' },
+    { label: '0-14 Days', count: 0, color: '#0D6331' },
+    { label: '14-28 Days', count: 0, color: '#C2870B' },
+    { label: '28+ Days', count: 0, color: '#D03B3B' },
   ]
   issues
     .filter((issue) => issue.statusKind !== 'void' && issue.createdOn)
@@ -388,12 +388,7 @@ function buildIssueTable(
         group,
       }
     })
-    .sort((a, b) => {
-      const groupOrder = ['Open Carryover', 'Closed in Report Week', 'Opened + Closed in Report Week', 'Closed This Week']
-      return groupOrder.indexOf(a.group) - groupOrder.indexOf(b.group)
-        || compareWorkWeeks(a.workWeek, b.workWeek)
-        || a.id.localeCompare(b.id)
-    })
+    .sort((a, b) => b.id.localeCompare(a.id, undefined, { numeric: true, sensitivity: 'base' }))
 }
 
 function buildElectrical(records: InspectionRecord[], reportWeek: WorkWeek): ElectricalPoint[] {
@@ -501,11 +496,11 @@ export function buildReportModel(
   const sorsSeries = sparkWeeks.map((week) => inspections.filter((row) => row.workWeek?.label === week.label && includesPhase(row.phase, 'SOR')).length)
 
   const kpis: KpiMetric[] = [
-    makeMetric('total-opened', 'Total Opened', totalOpened, previousTotalOpened, ClipboardList, 'neutral', compactNumber, cumOpenedSeries),
-    makeMetric('total-closed', 'Total Closed', totalClosed, previousTotalClosed, CheckCircle2, 'good', compactNumber, cumClosedSeries),
+    makeMetric('total-opened', 'Total Issues Opened', totalOpened, previousTotalOpened, ClipboardList, 'neutral', compactNumber, cumOpenedSeries),
+    makeMetric('total-closed', 'Total Issues Closed', totalClosed, previousTotalClosed, CheckCircle2, 'good', compactNumber, cumClosedSeries),
     makeMetric('opened-week', 'Issues Opened', openedWeek, openedPreviousWeek, TrendingUp, openedWeek > openedPreviousWeek ? 'warn' : 'neutral', compactNumber, openedWeekSeries),
     makeMetric('closed-week', 'Issues Closed', closedWeek, closedPreviousWeek, TrendingDown, closedWeek >= closedPreviousWeek ? 'good' : 'neutral', compactNumber, closedWeekSeries),
-    makeMetric('remaining-open', 'Remaining Open', remaining, previousRemaining, AlertCircle, remaining > previousRemaining ? 'warn' : 'good', compactNumber, remainingSeries),
+    makeMetric('remaining-open', 'Issues Remaining Open', remaining, previousRemaining, AlertCircle, remaining > previousRemaining ? 'warn' : 'good', compactNumber, remainingSeries),
     makeMetric('inspections', 'Inspections', inspectionsWeek, inspectionsPrevious, ClipboardCheck, 'good', compactNumber, inspectionsSeries),
     makeMetric('sors', 'SORs', sorsWeek, sorsPrevious, Wrench, sorsWeek > sorsPrevious ? 'warn' : 'neutral', compactNumber, sorsSeries),
     makeMetric('closure-rate', 'Closure Rate', closureRate, previousClosureRate, Gauge, 'good', (value) => percent(value, 1), closureRateSeries),
@@ -517,6 +512,10 @@ export function buildReportModel(
   const prevElectrical = electrical.find((point) => point.workWeek === previousReport.label)
   const reportWeld = welding.find((point) => point.workWeek === reportWeek.label)
   const prevWeld = welding.find((point) => point.workWeek === previousReport.label)
+  const weldingWeeksWithData = welding.filter((point) => point.total > 0)
+  const overallSignoffRate = weldingWeeksWithData.length
+    ? weldingWeeksWithData.reduce((sum, point) => sum + point.signoffRate, 0) / weldingWeeksWithData.length
+    : 0
 
   return {
     generatedAt: now,
@@ -540,13 +539,14 @@ export function buildReportModel(
       electricalIssuesFound: reportElectrical?.issuesFound ?? 0,
       weldsChecked: reportWeld?.total ?? 0,
       weldsSigned: reportWeld?.signed ?? 0,
-      avgSignoffRate: reportWeld?.signoffRate ?? 0,
+      overallSignoffRate,
+      reportWeekSignoffRate: reportWeld?.signoffRate ?? 0,
       deltas: {
         electricalFinals: (reportElectrical?.finals ?? 0) - (prevElectrical?.finals ?? 0),
         electricalIssuesFound: (reportElectrical?.issuesFound ?? 0) - (prevElectrical?.issuesFound ?? 0),
         weldsChecked: (reportWeld?.total ?? 0) - (prevWeld?.total ?? 0),
         weldsSigned: (reportWeld?.signed ?? 0) - (prevWeld?.signed ?? 0),
-        avgSignoffRate: (reportWeld?.signoffRate ?? 0) - (prevWeld?.signoffRate ?? 0),
+        reportWeekSignoffRate: (reportWeld?.signoffRate ?? 0) - (prevWeld?.signoffRate ?? 0),
       },
     },
   }

@@ -133,7 +133,8 @@ export interface ReportModel {
     electricalIssuesFound: number
     weldsChecked: number
     weldsSigned: number
-    avgSignoffRate: number
+    overallSignoffRate: number
+    reportWeekSignoffRate: number
     deltas: Record<string, number>
   }
 }

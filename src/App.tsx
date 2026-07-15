@@ -4,7 +4,6 @@ import {
   AlertCircle,
   Archive,
   Bell,
-  Bolt,
   CalendarClock,
   CheckCircle2,
   ChevronDown,
@@ -12,6 +11,7 @@ import {
   Download,
   FileSpreadsheet,
   Filter,
+  Flame,
   FolderOpen,
   Gauge,
   GitBranch,
@@ -23,8 +23,8 @@ import {
   SlidersHorizontal,
   Table2,
   Trash2,
-  Wrench,
   X,
+  Zap,
 } from 'lucide-react'
 import { buildReportModel, mergeFilters } from '@/calculations/report'
 import { buildSampleBundle } from '@/data/sampleData'
@@ -55,8 +55,8 @@ import { compareWorkWeeks } from '@/utils/workWeeks'
 const ROLE_CONFIG: Record<SheetRole, { label: string; icon: typeof AlertCircle; color: string }> = {
   bimIssues: { label: 'BIM Issues Log', icon: AlertCircle, color: '#38bdf8' },
   mechanical: { label: 'Mechanical / Process', icon: ClipboardCheck, color: '#14b8a6' },
-  electrical: { label: 'Electrical Inspections', icon: Bolt, color: '#f59e0b' },
-  welding: { label: 'Welding Signoffs', icon: Wrench, color: '#22c55e' },
+  electrical: { label: 'Electrical Inspections', icon: Zap, color: '#f59e0b' },
+  welding: { label: 'Welding Signoffs', icon: Flame, color: '#22c55e' },
 }
 
 function emptySheet(name: string): SheetRecord {
@@ -257,7 +257,7 @@ function KpiTile({ metric, hero }: { metric: KpiMetric; hero?: boolean }) {
   const Icon = metric.icon
   const toneClass = metric.tone === 'good' ? 'good' : metric.tone === 'warn' ? 'warn' : metric.tone === 'bad' ? 'bad' : ''
   const arrow = metric.delta > 0.0001 ? '▲' : metric.delta < -0.0001 ? '▼' : ''
-  const deltaText = metric.deltaLabel.replace(' vs PW', '')
+  const deltaText = metric.deltaLabel
   return (
     <article className={cx('kpi-tile', hero && 'hero')}>
       <div className="kpi-tile-head">
@@ -279,7 +279,7 @@ function KpiTile({ metric, hero }: { metric: KpiMetric; hero?: boolean }) {
 }
 
 const KPI_GROUPS = {
-  primary: ['remaining-open', 'total-opened', 'total-closed', 'closure-rate'],
+  primary: ['total-closed', 'total-opened', 'remaining-open', 'closure-rate'],
   week: ['opened-week', 'closed-week', 'inspections', 'sors'],
 } as const
 
@@ -668,7 +668,7 @@ function ElectricalChart({ data }: { data: ElectricalPoint[] }) {
   const { max, ticks } = niceScale(Math.max(1, ...visible.map((point) => point.finals)))
   const width = 620
   const height = 360
-  const pad = { l: 44, r: 22, t: 20, b: 42 }
+  const pad = { l: 44, r: 22, t: 28, b: 42 }
   const chartW = width - pad.l - pad.r
   const chartH = height - pad.t - pad.b
   const step = chartW / Math.max(1, visible.length - 1)
@@ -694,21 +694,21 @@ function ElectricalChart({ data }: { data: ElectricalPoint[] }) {
         <path d={smoothPath(points)} className="electrical-line" fill="none" />
         {visible.map((point, index) => {
           const { x, y } = points[index]
-          const isLatest = index === visible.length - 1
           const isActive = index === hoveredIndex
+          const issueY = Math.min(pad.t + chartH - 11, y + 21)
           return (
             <g key={point.workWeek} onMouseEnter={() => setHoveredIndex(index)} onMouseLeave={() => setHoveredIndex(null)}>
               <rect className="chart-hit-area" x={x - step / 2} y={pad.t} width={step} height={chartH} />
               <circle cx={x} cy={y} r={isActive ? 5 : 3.5} className="electrical-dot" />
+              <text className="electrical-point-label" x={x} y={Math.max(12, y - 10)} textAnchor="middle">{point.finals}</text>
               {point.issuesFound > 0 && (
-                <g className="issue-badge" transform={`translate(${x} ${Math.max(pad.t + 12, y - 18)})`}>
+                <g className="issue-badge" transform={`translate(${x} ${issueY})`}>
                   <circle r="8" />
                   <text textAnchor="middle" y="3">{point.issuesFound}</text>
                 </g>
               )}
-              {isLatest && <text className="series-end-label electrical-label" x={x - 7} y={Math.max(pad.t + 12, y - 10)} textAnchor="end">{point.finals}</text>}
-              {(index % 4 === 0 || isLatest) && (
-                <text x={x} y={height - 22} textAnchor="middle">
+              {(index % 4 === 0 || index === visible.length - 1) && (
+                <text className="week-axis-label" x={x} y={height - 22} textAnchor="middle">
                   {shortWorkWeek(point.workWeek)}
                 </text>
               )}
@@ -730,17 +730,24 @@ function ElectricalChart({ data }: { data: ElectricalPoint[] }) {
 function WeldingChart({ data }: { data: WeldingPoint[] }) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
   const visible = data.slice(-24)
-  // Single axis = weld count. Signed welds sit inside the total-weld track, so the
-  // fill proportion reads as the sign-off rate without a second y-scale.
   const { max, ticks } = niceScale(Math.max(1, ...visible.map((point) => point.total)))
   const width = 620
   const height = 360
-  const pad = { l: 44, r: 22, t: 20, b: 42 }
+  const pad = { l: 44, r: 48, t: 34, b: 42 }
   const chartW = width - pad.l - pad.r
   const chartH = height - pad.t - pad.b
   const group = chartW / Math.max(visible.length, 1)
   const barW = Math.min(24, group * 0.56)
   const toY = (value: number) => pad.t + chartH - (value / max) * chartH
+  const toRateY = (value: number) => pad.t + chartH - (value / 100) * chartH
+  const rateTicks = [0, 25, 50, 75, 100]
+  const ratePoints = visible
+    .map((point, index) => ({
+      point,
+      x: pad.l + index * group + group / 2,
+      y: toRateY(point.signoffRate),
+    }))
+    .filter(({ point }) => point.total > 0)
   const hovered = hoveredIndex === null ? null : visible[hoveredIndex]
   return (
     <div className="chart-shell field-chart-shell">
@@ -751,34 +758,68 @@ function WeldingChart({ data }: { data: WeldingPoint[] }) {
             <text className="tick-label" x={pad.l - 9} y={toY(tick) + 4} textAnchor="end">{chartValue(tick)}</text>
           </g>
         ))}
+        {rateTicks.map((tick) => (
+          <text className="tick-label signoff-axis-label" key={tick} x={width - pad.r + 9} y={toRateY(tick) + 4}>{tick}%</text>
+        ))}
+        <line className="signoff-baseline" x1={pad.l} x2={width - pad.r} y1={toRateY(10)} y2={toRateY(10)} />
         {visible.map((point, index) => {
           const x = pad.l + index * group + (group - barW) / 2
           const totalH = (point.total / max) * chartH
           const signedH = (point.signed / max) * chartH
-          const isLatest = index === visible.length - 1
-          const isActive = index === hoveredIndex
+          const totalY = pad.t + chartH - totalH
+          const signedY = pad.t + chartH - signedH
           return (
             <g key={point.workWeek} onMouseEnter={() => setHoveredIndex(index)} onMouseLeave={() => setHoveredIndex(null)}>
               <rect className="chart-hit-area" x={pad.l + index * group} y={pad.t} width={group} height={chartH} />
-              <rect className="bar track" x={x} y={pad.t + chartH - totalH} width={barW} height={totalH} rx="3" />
-              <rect className="bar closed" x={x} y={pad.t + chartH - signedH} width={barW} height={signedH} rx="3" />
-              {point.issuesCreated > 0 && (
-                <g className="issue-badge" transform={`translate(${x + barW + 3} ${Math.max(pad.t + 10, toY(point.total) - 4)})`}>
-                  <circle r="7" />
-                  <text textAnchor="middle" y="3">{point.issuesCreated}</text>
-                </g>
+              <rect className="bar track" x={x} y={totalY} width={barW} height={totalH} rx="3" />
+              <rect className="bar closed" x={x} y={signedY} width={barW} height={signedH} rx="3" />
+              {point.total > 0 && (
+                <text className="weld-total-label" x={x + barW / 2} y={Math.max(pad.t + 9, totalY - 5)} textAnchor="middle">{point.total}</text>
               )}
-              {(isActive || isLatest) && (
-                <text className="series-end-label signoff-label" x={x + barW / 2} y={toY(point.total) - 8} textAnchor="middle">{percent(point.signoffRate, 0)}</text>
+              {point.signed > 0 && (
+                <text
+                  className={cx('weld-signed-label', signedH >= 16 && 'inside')}
+                  x={x + barW / 2}
+                  y={signedH >= 16 ? signedY + 12 : signedY - 4}
+                  textAnchor="middle"
+                >
+                  {point.signed}
+                </text>
               )}
-              {(index % 4 === 0 || isLatest) && (
-                <text x={pad.l + index * group + group / 2} y={height - 22} textAnchor="middle">
+              {(index % 4 === 0 || index === visible.length - 1) && (
+                <text className="week-axis-label" x={pad.l + index * group + group / 2} y={height - 22} textAnchor="middle">
                   {shortWorkWeek(point.workWeek)}
                 </text>
               )}
             </g>
           )
         })}
+        <path className="signoff-rate-line" d={smoothPath(ratePoints)} fill="none" />
+        {ratePoints.map(({ point, x, y }, index) => {
+          const labelY = index % 2 === 0
+            ? Math.max(pad.t + 10, y - 10)
+            : Math.min(pad.t + chartH - 5, y + 17)
+          return (
+            <g key={`rate-${point.workWeek}`}>
+              <circle className="signoff-rate-dot" cx={x} cy={y} r="3.5" />
+              <text className="signoff-rate-label" x={x} y={labelY} textAnchor="middle">{percent(point.signoffRate, 0)}</text>
+            </g>
+          )
+        })}
+        {visible.map((point, index) => {
+          if (point.issuesCreated <= 0) return null
+          const x = pad.l + index * group + group / 2
+          const totalY = toY(point.total)
+          const issueY = Math.max(pad.t + 10, totalY - 18)
+          return (
+            <g className="issue-badge" key={`issue-${point.workWeek}`} transform={`translate(${x} ${issueY})`}>
+              <circle r="8" />
+              <text textAnchor="middle" y="3">{point.issuesCreated}</text>
+            </g>
+          )
+        })}
+        <text className="axis-title" x={12} y={pad.t + chartH / 2} textAnchor="middle" transform={`rotate(-90 12 ${pad.t + chartH / 2})`}>Weld count</text>
+        <text className="axis-title signoff-axis-label" x={width - 10} y={pad.t + chartH / 2} textAnchor="middle" transform={`rotate(90 ${width - 10} ${pad.t + chartH / 2})`}>Sign-off rate</text>
       </svg>
       {hovered && (
         <ChartTooltip
@@ -930,9 +971,8 @@ function FieldSlide({ report, exportable }: { report: ReturnType<typeof buildRep
   const chips = [
     ['Electrical Finals', compactNumber(report.summary.electricalFinals), deltaLabel(report.summary.deltas.electricalFinals), ClipboardCheck],
     ['Electrical Issues Found', compactNumber(report.summary.electricalIssuesFound), deltaLabel(report.summary.deltas.electricalIssuesFound), AlertCircle],
-    ['Welds Checked', compactNumber(report.summary.weldsChecked), deltaLabel(report.summary.deltas.weldsChecked), Wrench],
+    ['Welds Checked', compactNumber(report.summary.weldsChecked), deltaLabel(report.summary.deltas.weldsChecked), Flame],
     ['Welds Signed', compactNumber(report.summary.weldsSigned), deltaLabel(report.summary.deltas.weldsSigned), CheckCircle2],
-    ['Avg Sign-off %', percent(report.summary.avgSignoffRate, 1), deltaLabel(report.summary.deltas.avgSignoffRate), Gauge],
   ] as const
   return (
     <SlideShell title="Inspections & Welding Signoffs" icon={<ClipboardCheck size={18} />} exportable={exportable}>
@@ -945,11 +985,28 @@ function FieldSlide({ report, exportable }: { report: ReturnType<typeof buildRep
             <em>{delta}</em>
           </article>
         ))}
+        <article className="field-chip signoff-summary-chip">
+          <div className="field-chip-heading">
+            <Gauge size={15} />
+            <span>Sign-off %</span>
+          </div>
+          <div className="signoff-summary-grid">
+            <div>
+              <small>Overall avg</small>
+              <strong>{percent(report.summary.overallSignoffRate, 1)}</strong>
+            </div>
+            <div>
+              <small>{report.reportWeek.label}</small>
+              <strong>{percent(report.summary.reportWeekSignoffRate, 1)}</strong>
+              <em>{deltaLabel(report.summary.deltas.reportWeekSignoffRate)}</em>
+            </div>
+          </div>
+        </article>
       </div>
       <div className="field-chart-grid">
         <article className="panel chart-panel">
           <div className="panel-title">
-            <Bolt size={16} />
+            <Zap size={16} />
             <h3>Electrical Inspections by Work Week</h3>
           </div>
           <div className="chart-legend">
@@ -960,13 +1017,15 @@ function FieldSlide({ report, exportable }: { report: ReturnType<typeof buildRep
         </article>
         <article className="panel chart-panel">
           <div className="panel-title">
-            <Wrench size={16} />
+            <Flame size={16} />
             <h3>Welding Signoffs by Work Week</h3>
           </div>
           <div className="chart-legend">
             <span className="legend-closed">Signed</span>
             <span className="legend-track">Total welds</span>
+            <span className="legend-signoff">Sign-off %</span>
             <span className="legend-issue">Issue created</span>
+            <span className="legend-baseline">10% baseline</span>
           </div>
           <WeldingChart data={report.welding} />
         </article>

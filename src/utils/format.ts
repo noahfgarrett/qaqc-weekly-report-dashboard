@@ -7,7 +7,7 @@ export function percent(value: number, fractionDigits = 0): string {
   return `${value.toFixed(fractionDigits)}%`
 }
 
-export function deltaLabel(value: number, suffix = ' vs PW'): string {
+export function deltaLabel(value: number, suffix = ' vs Previous Week'): string {
   if (Math.abs(value) < 0.0001) return `Flat${suffix}`
   const sign = value > 0 ? '+' : ''
   return `${sign}${Number.isInteger(value) ? value.toFixed(0) : value.toFixed(1)}${suffix}`

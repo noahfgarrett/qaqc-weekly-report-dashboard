@@ -7,6 +7,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.0.11',
+    date: '2026-07-15T13:00:55Z',
+    type: 'feature',
+    notes: [
+      'Electrical and Mechanical inspection rows now use General Contractor for Contractor filtering, while Welding Signoffs ignore the Contractor slicer',
+      'Welding Signoffs now combines signed and total weld bars with a secondary-axis sign-off percentage line, a 10% baseline, direct labels, and issue-count badges above each bar',
+      'Electrical inspections now label every weekly value and position issue-count badges below the corresponding line point',
+      'The sign-off summary now separates the average across active welding weeks from the selected report-week percentage',
+      'Issue details now sort from highest natural ID to lowest across the dashboard, PDF, and PowerPoint continuation pages',
+      'Project-to-date issue cards were reordered and clarified, issue aging now uses green, orange, and red severity colors, and report surfaces use more consistent icons and subtle shadows',
+      'Week-over-week comparisons now spell out Previous Week instead of using the PW abbreviation',
+    ],
+  },
+  {
     version: '1.0.9',
     date: '2026-07-15T11:23:09Z',
     type: 'major',

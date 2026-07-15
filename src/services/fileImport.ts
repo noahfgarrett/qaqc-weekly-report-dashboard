@@ -29,6 +29,7 @@ const KNOWN_HEADERS = new Set([
   'issues',
   'issuefound',
   'issuesfound',
+  'generalcontractor',
   'no',
   'weldno',
   'weldnumber',
