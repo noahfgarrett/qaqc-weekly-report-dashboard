@@ -7,6 +7,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.0.17',
+    date: '2026-07-22T16:06:50Z',
+    type: 'fix',
+    notes: [
+      'Electrical issue counts now include only rows whose Inspection Phase is Final, preventing non-final inspections from adding issue markers or summary totals',
+    ],
+  },
+  {
     version: '1.0.16',
     date: '2026-07-15T17:00:00Z',
     type: 'feature',
