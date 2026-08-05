@@ -50,7 +50,7 @@ const EMPTY_FILTERS: ReportFilters = {
   statuses: [],
 }
 
-type IssueStatus = 'open' | 'closed' | 'void'
+type IssueStatus = 'open' | 'pending' | 'closed' | 'void'
 
 interface IssueRecord {
   id: string
@@ -104,14 +104,16 @@ function normalizeStatus(status: string): IssueStatus {
   const lower = status.trim().toLowerCase()
   if (lower === 'void') return 'void'
   if (lower === 'closed' || lower === 'complete' || lower === 'completed') return 'closed'
+  if (lower === 'pending') return 'pending'
   return 'open'
 }
 
 function normalizeIssue(row: Record<string, unknown>): IssueRecord {
   const createdOn = parseDate(value(row, ['Created On', 'Created', 'Date Created']))
   const updatedOn = parseDate(value(row, ['Updated On', 'Updated', 'Closed On', 'Date Closed']))
-  const status = value(row, ['Status']) || 'Open'
-  const statusKind = normalizeStatus(status)
+  const rawStatus = value(row, ['Status']).trim() || 'Open'
+  const statusKind = normalizeStatus(rawStatus)
+  const status = statusKind === 'pending' ? 'Pending' : rawStatus
   return {
     id: value(row, ['ID', 'Issue ID', 'BIM ID']) || String(row.__rowNumber ?? row.__rowId ?? ''),
     status,

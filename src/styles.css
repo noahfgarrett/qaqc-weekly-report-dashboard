@@ -1834,6 +1834,11 @@ select:disabled {
   color: var(--warn);
 }
 
+.status-pill.pending {
+  background: rgba(194, 135, 11, 0.14);
+  color: #8a5c00;
+}
+
 .status-pill.overdue {
   background: rgba(208, 59, 59, 0.12);
   color: #b3261e;

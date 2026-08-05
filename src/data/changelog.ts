@@ -7,6 +7,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.0.18',
+    date: '2026-08-05T18:06:48Z',
+    type: 'fix',
+    notes: [
+      'BIM issues whose Status is Pending now explicitly count as open throughout totals, remaining-open backlog, weekly and monthly trends, aging, filtering, and detail exports',
+      'Pending appears as its own Status slicer value and uses a consistent amber treatment in the HTML dashboard, PDF output, and PowerPoint issue table',
+      'Added a focused regression check that verifies Pending contributes to opened and remaining totals but never to closed totals',
+    ],
+  },
+  {
     version: '1.0.17',
     date: '2026-07-22T16:06:50Z',
     type: 'fix',

@@ -605,7 +605,14 @@ function addIssueTable(slide: pptxgen.Slide, rows: IssueDetailRow[]): void {
     const values = [row.id, row.subtype, row.status, row.title, row.contractor, row.workWeek, row.createdOn, row.workWeekClosed, row.dueDate]
     cursor = x
     columns.forEach(([, width], index) => {
-      const statusColor = row.status.toLowerCase().includes('closed') ? C.mint : row.status.toLowerCase().includes('overdue') ? C.coral : C.teal
+      const normalizedStatus = row.status.toLowerCase()
+      const statusColor = normalizedStatus.includes('closed')
+        ? C.mint
+        : normalizedStatus.includes('overdue')
+          ? C.coral
+          : normalizedStatus.includes('pending')
+            ? C.amber
+            : C.teal
       slide.addText(values[index], {
         x: cursor + 0.05,
         y: yy + 0.025,

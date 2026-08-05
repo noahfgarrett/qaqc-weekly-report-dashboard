@@ -4,7 +4,7 @@ import { enumerateWorkWeeks, parseWorkWeek, toIsoWorkWeek, workWeekStart } from 
 const contractors = ['Apex Mechanical', 'Northline Electric', 'Vector BIM', 'Summit Fab', 'FieldTech']
 const subtypes = ['Coordination', 'Install Conflict', 'Clearance', 'Access', 'Documentation', 'Quality']
 const disciplines = ['Mechanical', 'Process', 'Electrical', 'BIM', 'Welding']
-const statuses = ['Open', 'In Progress', 'Closed', 'Closed', 'Closed', 'Open']
+const statuses = ['Open', 'Pending', 'In Progress', 'Closed', 'Closed', 'Closed', 'Open']
 
 let seed = 42
 
@@ -101,6 +101,17 @@ function buildIssues(): Record<string, unknown>[] {
       'Created On': '2026-07-01',
       'Updated On': '2026-07-01',
       'Due Date': '2026-07-21',
+    },
+    {
+      ID: 'BIM-1994',
+      Status: 'Pending',
+      Subtype: 'Coordination',
+      Title: 'Pending field coordination response',
+      Contractor: 'Vector BIM',
+      Discipline: 'BIM',
+      'Created On': '2026-07-02',
+      'Updated On': '2026-07-02',
+      'Due Date': '2026-07-23',
     },
   )
 
