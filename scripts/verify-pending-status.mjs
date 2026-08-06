@@ -48,29 +48,49 @@ if (pendingMetric('total-opened') !== 1 || pendingMetric('total-closed') !== 0 |
   throw new Error('The Pending Status filter does not preserve open-issue math.')
 }
 
-const migratedPendingBundle = {
+const strictDetailBundle = {
   ...bundle,
   sheets: {
     ...bundle.sheets,
     bimIssues: {
-      id: 'bim-migrated',
+      id: 'bim-strict-detail',
       name: 'BIM Issues Log',
       rows: [
         { ID: '1018', Status: 'Pending', 'Created On': '2026-07-24', 'Updated On': '2026-07-31' },
+        { ID: '1019', Status: 'Pending', 'Created On': '2026-07-29', 'Updated On': '2026-07-31' },
+        { ID: '1020', Status: 'Closed', 'Created On': '2026-07-01', 'Updated On': '2026-07-31' },
+        { ID: '1021', Status: 'Closed', 'Created On': '2026-07-29', 'Updated On': '2026-07-31' },
+        { ID: '1022', Status: 'Closed', 'Created On': '2026-07-01', 'Updated On': '2026-08-04' },
+        { ID: '999', Status: 'Open', 'Created On': '2026-04-24', 'Updated On': '2026-07-31' },
       ],
     },
   },
 }
-const migratedPendingReport = buildReportModel(
-  migratedPendingBundle,
+const strictDetailReport = buildReportModel(
+  strictDetailBundle,
   mergeFilters({ oac: true }),
   new Date(2026, 7, 6, 12),
 )
-if (migratedPendingReport.reportWeek.label !== "WW31'2026") {
-  throw new Error('The migrated Pending issue regression is not using the expected reporting week.')
+if (strictDetailReport.reportWeek.label !== "WW31'2026") {
+  throw new Error('The strict issue-detail regression is not using the expected reporting week.')
 }
-if (!migratedPendingReport.issueTable.some((row) => row.id === '1018' && row.status === 'Open')) {
-  throw new Error('A Pending issue updated during the reporting week is missing from BIM Issues Detail.')
+const strictIds = strictDetailReport.issueTable.map((row) => row.id)
+if (strictIds.join(',') !== '1022,1021,1020,1019') {
+  throw new Error('BIM Issues Detail contains rows outside the four report activity cards.')
+}
+const expectedGroups = new Map([
+  ['1019', 'Opened in Report Week'],
+  ['1020', 'Closed in Report Week'],
+  ['1021', 'Opened + Closed in Report Week'],
+  ['1022', 'Closed This Week'],
+])
+strictDetailReport.issueTable.forEach((row) => {
+  if (row.group !== expectedGroups.get(row.id)) {
+    throw new Error(row.id + ' was assigned to the wrong issue-detail card.')
+  }
+})
+if (strictDetailReport.issueTable.find((row) => row.id === '1019')?.status !== 'Open') {
+  throw new Error('A reporting-week Pending issue must display as Open.')
 }
 `
 
@@ -89,7 +109,7 @@ try {
     },
   })
   await import(`${pathToFileURL(resolve(outputDirectory, 'pending-status-check.mjs')).href}?t=${Date.now()}`)
-  console.log('Pending status counts as open and reporting-week updates remain visible in issue details.')
+  console.log('Pending counts as open and BIM Issues Detail is limited to its four report activity cards.')
 } finally {
   await rm(temporaryDirectory, { recursive: true, force: true })
 }

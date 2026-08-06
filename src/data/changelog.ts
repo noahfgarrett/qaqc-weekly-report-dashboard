@@ -7,6 +7,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.0.26',
+    date: '2026-08-06T12:50:09Z',
+    type: 'fix',
+    notes: [
+      'BIM Issues Detail is now limited to issues represented by its four activity cards',
+      'The detail list includes issues opened in the reporting week, closed in the reporting week, opened and closed in the reporting week, or closed in the current week',
+      'Older open issues are no longer included solely because their Updated on date falls within the reporting week',
+    ],
+  },
+  {
     version: '1.0.25',
     date: '2026-08-06T12:28:06Z',
     type: 'fix',

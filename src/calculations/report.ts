@@ -365,10 +365,7 @@ function buildIssueTable(
       const openedInReport = issue.createdWeek.label === reportWeek.label
       const closedInReport = issue.closedWeek?.label === reportWeek.label
       const closedThisWeek = issue.closedWeek?.label === currentWeek.label
-      const updatedInReport = issue.statusKind !== 'closed'
-        && issue.updatedOn
-        && toIsoWorkWeek(issue.updatedOn).label === reportWeek.label
-      if (activityWindowOnly) return openedInReport || closedInReport || closedThisWeek || !!updatedInReport
+      if (activityWindowOnly) return openedInReport || closedInReport || closedThisWeek
 
       const createdThroughReport = compareWorkWeeks(issue.createdWeek, reportWeek) <= 0
       if (issue.statusKind !== 'closed') return createdThroughReport
