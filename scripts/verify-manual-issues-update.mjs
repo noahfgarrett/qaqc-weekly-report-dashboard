@@ -31,13 +31,13 @@ const workbookBytes = (rows) => {
 }
 const currentBytes = workbookBytes([
   issueHeaders,
-  ['BIM-100', 'Existing issue', 'Open', 'Coordination', '2026-06-01', '', '2026-06-10', 'Old Trade', 'BIM'],
+  ['BIM-100', 'Existing issue', 'Open', 'Coordination', '2026-06-01', '2026-06-18', '2026-06-10', 'Old Trade', 'BIM'],
   ['BIM-950', 'Higher existing issue', 'Open', 'Quality', '2026-06-20', '', '2026-07-01', 'Trade C', 'Mechanical'],
 ])
 const accHeaders = issueHeaders.map((header) => header === 'Subtype' ? 'Type' : header)
 const accBytes = workbookBytes([
   [...accHeaders, 'Category', 'Created By', 'Created By (Company)'],
-  ['BIM-100', 'Transferred existing issue', 'Closed', 'Access', '2026-07-24', '2026-07-02', '2026-07-05', '', 'BIM', 'Coordination', 'Peter Autodesk', 'Other'],
+  ['BIM-100', 'Transferred existing issue', 'Closed', 'Access', '2026-07-24', '2026-07-24', '2026-07-05', '', 'BIM', 'Coordination', 'Peter Autodesk', 'Other'],
   ['BIM-1001', 'New LotusWorks issue', 'Pending', 'Clearance', '2026-07-08', '', '2026-07-20', 'Trade B', 'Electrical', 'Field', 'Jamie Doe - LotusWorks', 'Other'],
   ['bim-1001', 'Duplicate export row', 'Pending', 'Clearance', '2026-07-08', '', '2026-07-20', 'Trade B', 'Electrical', 'Field', 'LotusWorks', 'Other'],
   ['BIM-102', 'Other owner issue', 'Open', 'Quality', '2026-07-09', '', '', 'Trade C', 'Mechanical', 'Field', 'Outside Contractor', 'LotusWorks'],
@@ -92,6 +92,13 @@ if (!(preservedCreatedOn instanceof Date) || preservedCreatedOn.toISOString().sl
 }
 if (toIsoWorkWeek(preservedCreatedOn).label !== "WW23'2026") {
   throw new Error('The preserved historical date no longer resolves to its original work week.')
+}
+const preservedUpdatedOn = updated.Sheets.Issues.F4?.v
+if (!(preservedUpdatedOn instanceof Date) || preservedUpdatedOn.toISOString().slice(0, 10) !== '2026-06-18') {
+  throw new Error('ACC transfer dates must not replace Updated on for existing BIM IDs.')
+}
+if (toIsoWorkWeek(preservedUpdatedOn).label !== "WW25'2026") {
+  throw new Error('The preserved historical closure date no longer resolves to its original work week.')
 }
 if (!output.fileName.includes('BIM_Issues_Log-Updated-')) {
   throw new Error('The updated workbook filename is not traceable to the source log.')

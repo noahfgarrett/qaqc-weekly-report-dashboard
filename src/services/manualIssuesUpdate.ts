@@ -349,7 +349,12 @@ export function reconcileIssueRows(
     const changedFields: string[] = []
     ISSUE_FIELDS.forEach((field) => {
       const incoming = incomingValues[field.key]
-      if (field.key === 'id' || field.key === 'createdOn' || isBlank(incoming)) return
+      if (
+        field.key === 'id'
+        || field.key === 'createdOn'
+        || field.key === 'updatedOn'
+        || isBlank(incoming)
+      ) return
       if (comparable(currentValues[field.key]) !== comparable(incoming)) {
         mergedValues[field.key] = incoming
         changedFields.push(field.label)

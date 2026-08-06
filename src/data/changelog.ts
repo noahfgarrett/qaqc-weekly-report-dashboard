@@ -7,6 +7,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.0.23',
+    date: '2026-08-06T11:47:02Z',
+    type: 'fix',
+    notes: [
+      'Manual Issues Update now preserves the original BIM Issues Log Updated on value for every existing ID',
+      'Historical issue closure work weeks are no longer replaced by the ACC migration date',
+      'Regression coverage verifies both Created on and Updated on remain in their original historical work weeks',
+    ],
+  },
+  {
     version: '1.0.22',
     date: '2026-08-06T11:41:21Z',
     type: 'fix',
