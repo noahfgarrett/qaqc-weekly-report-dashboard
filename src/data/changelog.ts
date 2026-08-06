@@ -7,6 +7,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.0.25',
+    date: '2026-08-06T12:28:06Z',
+    type: 'fix',
+    notes: [
+      'BIM Issues Detail now includes open and Pending issues updated during the reporting week, even when they were created earlier',
+      'Pending issues included through reporting-week activity continue to display as Open and count toward open-issue metrics',
+      'Regression coverage verifies issue 1018-style activity across WW30 creation and WW31 update dates',
+    ],
+  },
+  {
     version: '1.0.24',
     date: '2026-08-06T11:59:10Z',
     type: 'fix',

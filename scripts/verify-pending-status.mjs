@@ -47,6 +47,31 @@ const pendingMetric = (id) => pendingOnly.kpis.find((item) => item.id === id)?.r
 if (pendingMetric('total-opened') !== 1 || pendingMetric('total-closed') !== 0 || pendingMetric('remaining-open') !== 1) {
   throw new Error('The Pending Status filter does not preserve open-issue math.')
 }
+
+const migratedPendingBundle = {
+  ...bundle,
+  sheets: {
+    ...bundle.sheets,
+    bimIssues: {
+      id: 'bim-migrated',
+      name: 'BIM Issues Log',
+      rows: [
+        { ID: '1018', Status: 'Pending', 'Created On': '2026-07-24', 'Updated On': '2026-07-31' },
+      ],
+    },
+  },
+}
+const migratedPendingReport = buildReportModel(
+  migratedPendingBundle,
+  mergeFilters({ oac: true }),
+  new Date(2026, 7, 6, 12),
+)
+if (migratedPendingReport.reportWeek.label !== "WW31'2026") {
+  throw new Error('The migrated Pending issue regression is not using the expected reporting week.')
+}
+if (!migratedPendingReport.issueTable.some((row) => row.id === '1018' && row.status === 'Open')) {
+  throw new Error('A Pending issue updated during the reporting week is missing from BIM Issues Detail.')
+}
 `
 
 try {
@@ -64,7 +89,7 @@ try {
     },
   })
   await import(`${pathToFileURL(resolve(outputDirectory, 'pending-status-check.mjs')).href}?t=${Date.now()}`)
-  console.log('Pending status counts as open, remains filterable, and displays as Open in issue details.')
+  console.log('Pending status counts as open and reporting-week updates remain visible in issue details.')
 } finally {
   await rm(temporaryDirectory, { recursive: true, force: true })
 }
