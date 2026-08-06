@@ -31,13 +31,14 @@ const workbookBytes = (rows) => {
 const currentBytes = workbookBytes([
   issueHeaders,
   ['BIM-100', 'Existing issue', 'Open', 'Coordination', '2026-06-01', '', '2026-06-10', 'Old Trade', 'BIM'],
+  ['BIM-950', 'Higher existing issue', 'Open', 'Quality', '2026-06-20', '', '2026-07-01', 'Trade C', 'Mechanical'],
 ])
 const accHeaders = issueHeaders.map((header) => header === 'Subtype' ? 'Type' : header)
 const accBytes = workbookBytes([
   [...accHeaders, 'Category', 'Created By', 'Created By (Company)'],
   ['BIM-100', 'Transferred existing issue', 'Closed', 'Access', '2026-07-01', '2026-07-02', '2026-07-05', '', 'BIM', 'Coordination', 'Peter Autodesk', 'Other'],
-  ['BIM-101', 'New LotusWorks issue', 'Pending', 'Clearance', '2026-07-08', '', '2026-07-20', 'Trade B', 'Electrical', 'Field', 'Jamie Doe - LotusWorks', 'Other'],
-  ['bim-101', 'Duplicate export row', 'Pending', 'Clearance', '2026-07-08', '', '2026-07-20', 'Trade B', 'Electrical', 'Field', 'LotusWorks', 'Other'],
+  ['BIM-1001', 'New LotusWorks issue', 'Pending', 'Clearance', '2026-07-08', '', '2026-07-20', 'Trade B', 'Electrical', 'Field', 'Jamie Doe - LotusWorks', 'Other'],
+  ['bim-1001', 'Duplicate export row', 'Pending', 'Clearance', '2026-07-08', '', '2026-07-20', 'Trade B', 'Electrical', 'Field', 'LotusWorks', 'Other'],
   ['BIM-102', 'Other owner issue', 'Open', 'Quality', '2026-07-09', '', '', 'Trade C', 'Mechanical', 'Field', 'Outside Contractor', 'LotusWorks'],
   ['', 'Missing ID', 'Open', 'Quality', '2026-07-09', '', '', '', 'Mechanical', 'Field', 'LotusWorks', 'Other'],
 ])
@@ -47,7 +48,7 @@ const current = await prepareIssueWorkbook(currentFile, 'current')
 const acc = await prepareIssueWorkbook(accFile, 'acc')
 const analysis = reconcileIssueRows(current, acc)
 
-if (analysis.trackedExistingIds !== 1) throw new Error('The current BIM log did not establish the tracked ID set.')
+if (analysis.trackedExistingIds !== 2) throw new Error('The current BIM log did not establish the tracked ID set.')
 if (analysis.lotusWorksRows !== 2) throw new Error('Existing and new LotusWorks issue selection returned the wrong row count.')
 if (analysis.updatedIssues.length !== 1 || analysis.updatedIssues[0].id !== 'BIM-100') {
   throw new Error('The transferred existing issue was not selected for update.')
@@ -55,32 +56,39 @@ if (analysis.updatedIssues.length !== 1 || analysis.updatedIssues[0].id !== 'BIM
 if (analysis.skippedDuplicateIds !== 1) throw new Error('Duplicate ACC IDs were not skipped.')
 if (analysis.skippedMissingIds !== 1) throw new Error('Rows without IDs were not skipped.')
 if (analysis.excludedOtherOwners !== 1) throw new Error('Non-LotusWorks creators were not excluded.')
-if (analysis.newIssues.length !== 1 || analysis.newIssues[0].id !== 'BIM-101') {
+if (analysis.newIssues.length !== 1 || analysis.newIssues[0].id !== 'BIM-1001') {
   throw new Error('The expected new LotusWorks issue was not selected.')
 }
 
 const output = buildUpdatedIssueWorkbook(current, analysis)
-const updated = XLSX.read(output.bytes, { type: 'array', cellDates: true })
+const updated = XLSX.read(output.bytes, { type: 'array', cellDates: true, cellStyles: true })
 const rows = XLSX.utils.sheet_to_json(updated.Sheets.Issues, { defval: '', raw: false })
-if (rows.length !== 2) throw new Error('The updated workbook should contain one appended row.')
-const updatedExisting = rows[0]
-const appended = rows[1]
+if (rows.length !== 3) throw new Error('The updated workbook should contain one appended row.')
+if (rows.map((row) => row.ID).join(',') !== 'BIM-1001,BIM-950,BIM-100') {
+  throw new Error('Issue rows are not sorted by descending numeric ID.')
+}
+const appended = rows[0]
+const updatedExisting = rows[2]
 if (updatedExisting.Status !== 'Closed' || updatedExisting.Title !== 'Transferred existing issue') {
   throw new Error('The existing issue was not updated from the ACC export.')
 }
 if (updatedExisting.Contractor !== 'Old Trade') {
   throw new Error('A blank ACC value overwrote an existing BIM log value.')
 }
-if (appended.ID !== 'BIM-101' || appended.Status !== 'Pending' || appended.Contractor !== 'Trade B') {
+if (appended.ID !== 'BIM-1001' || appended.Status !== 'Pending' || appended.Contractor !== 'Trade B') {
   throw new Error('The appended issue fields do not match the ACC export.')
 }
 if (updatedExisting.Subtype !== 'Access' || appended.Subtype !== 'Clearance') {
   throw new Error('ACC Type was not mapped into the BIM Subtype column.')
 }
+for (const address of ['E2', 'G2', 'E3', 'G3', 'E4', 'F4', 'G4']) {
+  const cell = updated.Sheets.Issues[address]
+  if (!cell || cell.z !== 'm/d/yy') throw new Error(address + ' is not formatted as an Excel short date.')
+}
 if (!output.fileName.includes('BIM_Issues_Log-Updated-')) {
   throw new Error('The updated workbook filename is not traceable to the source log.')
 }
-if (current.rows.length !== 1) throw new Error('The source workbook model was mutated.')
+if (current.rows.length !== 2) throw new Error('The source workbook model was mutated.')
 `
 
 try {

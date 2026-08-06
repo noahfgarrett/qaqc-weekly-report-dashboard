@@ -7,6 +7,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.0.21',
+    date: '2026-08-06T11:30:53Z',
+    type: 'fix',
+    notes: [
+      'Manual Issues Update now writes Created on, Updated on, and Due date as true Excel short-date cells instead of General-formatted values',
+      'Updated BIM workbooks are sorted by numeric-aware descending ID so the highest BIM issue number appears first',
+      'The descending sort moves complete worksheet rows together, preserving every related field while placing blank-ID rows last',
+      'Workbook regression coverage now verifies date formats and BIM-1000-series ordering in the generated XLSX file',
+    ],
+  },
+  {
     version: '1.0.20',
     date: '2026-08-06T11:23:30Z',
     type: 'fix',

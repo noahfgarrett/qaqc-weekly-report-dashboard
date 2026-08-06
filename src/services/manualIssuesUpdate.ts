@@ -1,4 +1,5 @@
 import * as XLSX from 'xlsx'
+import { parseDate } from '@/utils/workWeeks'
 
 export type ManualIssueWorkbookKind = 'current' | 'acc'
 
@@ -33,6 +34,8 @@ const ISSUE_FIELDS: IssueFieldDefinition[] = [
 
 const CREATOR_ALIASES = ['Created By', 'Issue Owner']
 const SUPPORTED_EXTENSIONS = ['.xls', '.xlsx', '.csv']
+const SHORT_DATE_FORMAT = 'm/d/yy'
+const DATE_FIELDS = new Set<ManualIssueField>(['createdOn', 'updatedOn', 'dueDate'])
 
 export interface PreparedIssueWorkbook {
   kind: ManualIssueWorkbookKind
@@ -385,8 +388,20 @@ function cloneStyle<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T
 }
 
-function makeCell(value: unknown, template?: XLSX.CellObject): XLSX.CellObject {
-  const cell: XLSX.CellObject = value instanceof Date && !Number.isNaN(value.getTime())
+function excelDate(value: unknown): Date | null {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return value
+  if (typeof value === 'number') {
+    const parsed = XLSX.SSF.parse_date_code(value)
+    if (parsed) return new Date(parsed.y, parsed.m - 1, parsed.d, 12)
+  }
+  return parseDate(value)
+}
+
+function makeCell(value: unknown, template?: XLSX.CellObject, dateField = false): XLSX.CellObject {
+  const dateValue = dateField && !isBlank(value) ? excelDate(value) : null
+  const cell: XLSX.CellObject = dateValue
+    ? { t: 'd', v: dateValue }
+    : value instanceof Date && !Number.isNaN(value.getTime())
     ? { t: 'd', v: value }
     : typeof value === 'number'
       ? { t: 'n', v: value }
@@ -395,7 +410,67 @@ function makeCell(value: unknown, template?: XLSX.CellObject): XLSX.CellObject {
         : { t: 's', v: String(value ?? '') }
   if (template?.s) cell.s = cloneStyle(template.s)
   if (template?.z) cell.z = template.z
+  if (dateField) cell.z = SHORT_DATE_FORMAT
   return cell
+}
+
+function sortRowsByDescendingId(
+  worksheet: XLSX.WorkSheet,
+  current: PreparedIssueWorkbook,
+  lastDataRow: number,
+): void {
+  const range = XLSX.utils.decode_range(worksheet['!ref'] ?? 'A1')
+  const firstDataRow = current.headerRow + 1
+  const idColumn = current.fieldColumns.id
+  const rows = Array.from({ length: Math.max(0, lastDataRow - firstDataRow + 1) }, (_, index) => {
+    const row = firstDataRow + index
+    const cells = new Map<number, XLSX.CellObject>()
+    for (let column = range.s.c; column <= range.e.c; column += 1) {
+      const cell = worksheet[XLSX.utils.encode_cell({ r: row, c: column })]
+      if (cell) cells.set(column, cell)
+    }
+    const id = String(worksheet[XLSX.utils.encode_cell({ r: row, c: idColumn })]?.v ?? '').trim()
+    return { id, originalRow: row, cells }
+  })
+
+  rows.sort((a, b) => {
+    if (!a.id && !b.id) return a.originalRow - b.originalRow
+    if (!a.id) return 1
+    if (!b.id) return -1
+    return b.id.localeCompare(a.id, undefined, { numeric: true, sensitivity: 'base' })
+  })
+
+  for (let row = firstDataRow; row <= lastDataRow; row += 1) {
+    for (let column = range.s.c; column <= range.e.c; column += 1) {
+      delete worksheet[XLSX.utils.encode_cell({ r: row, c: column })]
+    }
+  }
+  rows.forEach((rowData, index) => {
+    const targetRow = firstDataRow + index
+    rowData.cells.forEach((cell, column) => {
+      worksheet[XLSX.utils.encode_cell({ r: targetRow, c: column })] = cell
+    })
+  })
+}
+
+function formatDateColumns(
+  worksheet: XLSX.WorkSheet,
+  current: PreparedIssueWorkbook,
+  lastDataRow: number,
+): void {
+  for (let row = current.headerRow + 1; row <= lastDataRow; row += 1) {
+    DATE_FIELDS.forEach((field) => {
+      const address = XLSX.utils.encode_cell({ r: row, c: current.fieldColumns[field] })
+      const cell = worksheet[address]
+      if (!cell || isBlank(cell.v)) return
+      if (cell.f) {
+        cell.z = SHORT_DATE_FORMAT
+        delete cell.w
+        return
+      }
+      worksheet[address] = makeCell(cell.v, cell, true)
+    })
+  }
 }
 
 function updatedFileName(fileName: string): string {
@@ -421,7 +496,7 @@ export function buildUpdatedIssueWorkbook(
     ISSUE_FIELDS.forEach((field) => {
       const column = current.fieldColumns[field.key]
       const targetAddress = XLSX.utils.encode_cell({ r: issue.targetRow as number, c: column })
-      worksheet[targetAddress] = makeCell(issue.values[field.key], worksheet[targetAddress])
+      worksheet[targetAddress] = makeCell(issue.values[field.key], worksheet[targetAddress], DATE_FIELDS.has(field.key))
     })
   })
 
@@ -431,19 +506,23 @@ export function buildUpdatedIssueWorkbook(
       const column = current.fieldColumns[field.key]
       const targetAddress = XLSX.utils.encode_cell({ r: targetRow, c: column })
       const templateAddress = XLSX.utils.encode_cell({ r: current.lastDataRow, c: column })
-      worksheet[targetAddress] = makeCell(issue.values[field.key], worksheet[templateAddress])
+      worksheet[targetAddress] = makeCell(issue.values[field.key], worksheet[templateAddress], DATE_FIELDS.has(field.key))
     })
   })
 
   const originalRange = XLSX.utils.decode_range(worksheet['!ref'] ?? 'A1')
-  originalRange.e.r = Math.max(originalRange.e.r, current.lastDataRow + analysis.newIssues.length)
+  const lastDataRow = current.lastDataRow + analysis.newIssues.length
+  originalRange.e.r = Math.max(originalRange.e.r, lastDataRow)
   worksheet['!ref'] = XLSX.utils.encode_range(originalRange)
   const autoFilter = worksheet['!autofilter'] as { ref?: string } | undefined
   if (autoFilter?.ref) {
     const filterRange = XLSX.utils.decode_range(autoFilter.ref)
-    filterRange.e.r = Math.max(filterRange.e.r, current.lastDataRow + analysis.newIssues.length)
+    filterRange.e.r = Math.max(filterRange.e.r, lastDataRow)
     autoFilter.ref = XLSX.utils.encode_range(filterRange)
   }
+
+  sortRowsByDescendingId(worksheet, current, lastDataRow)
+  formatDateColumns(worksheet, current, lastDataRow)
 
   const output = XLSX.write(workbook, {
     type: 'array',
