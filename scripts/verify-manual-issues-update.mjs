@@ -32,13 +32,14 @@ const currentBytes = workbookBytes([
   issueHeaders,
   ['BIM-100', 'Existing issue', 'Open', 'Coordination', '2026-06-01', '', '2026-06-10', 'Old Trade', 'BIM'],
 ])
+const accHeaders = issueHeaders.map((header) => header === 'Subtype' ? 'Type' : header)
 const accBytes = workbookBytes([
-  [...issueHeaders, 'Created By', 'Created By (Company)'],
-  ['BIM-100', 'Transferred existing issue', 'Closed', 'Access', '2026-07-01', '2026-07-02', '2026-07-05', '', 'BIM', 'Peter Autodesk', 'Other'],
-  ['BIM-101', 'New LotusWorks issue', 'Pending', 'Clearance', '2026-07-08', '', '2026-07-20', 'Trade B', 'Electrical', 'Jamie Doe - LotusWorks', 'Other'],
-  ['bim-101', 'Duplicate export row', 'Pending', 'Clearance', '2026-07-08', '', '2026-07-20', 'Trade B', 'Electrical', 'LotusWorks', 'Other'],
-  ['BIM-102', 'Other owner issue', 'Open', 'Quality', '2026-07-09', '', '', 'Trade C', 'Mechanical', 'Outside Contractor', 'LotusWorks'],
-  ['', 'Missing ID', 'Open', 'Quality', '2026-07-09', '', '', '', 'Mechanical', 'LotusWorks', 'Other'],
+  [...accHeaders, 'Category', 'Created By', 'Created By (Company)'],
+  ['BIM-100', 'Transferred existing issue', 'Closed', 'Access', '2026-07-01', '2026-07-02', '2026-07-05', '', 'BIM', 'Coordination', 'Peter Autodesk', 'Other'],
+  ['BIM-101', 'New LotusWorks issue', 'Pending', 'Clearance', '2026-07-08', '', '2026-07-20', 'Trade B', 'Electrical', 'Field', 'Jamie Doe - LotusWorks', 'Other'],
+  ['bim-101', 'Duplicate export row', 'Pending', 'Clearance', '2026-07-08', '', '2026-07-20', 'Trade B', 'Electrical', 'Field', 'LotusWorks', 'Other'],
+  ['BIM-102', 'Other owner issue', 'Open', 'Quality', '2026-07-09', '', '', 'Trade C', 'Mechanical', 'Field', 'Outside Contractor', 'LotusWorks'],
+  ['', 'Missing ID', 'Open', 'Quality', '2026-07-09', '', '', '', 'Mechanical', 'Field', 'LotusWorks', 'Other'],
 ])
 const currentFile = new File([currentBytes], 'BIM_Issues_Log.xlsx')
 const accFile = new File([accBytes], 'ACC_Issues_Export.xlsx')
@@ -72,6 +73,9 @@ if (updatedExisting.Contractor !== 'Old Trade') {
 }
 if (appended.ID !== 'BIM-101' || appended.Status !== 'Pending' || appended.Contractor !== 'Trade B') {
   throw new Error('The appended issue fields do not match the ACC export.')
+}
+if (updatedExisting.Subtype !== 'Access' || appended.Subtype !== 'Clearance') {
+  throw new Error('ACC Type was not mapped into the BIM Subtype column.')
 }
 if (!output.fileName.includes('BIM_Issues_Log-Updated-')) {
   throw new Error('The updated workbook filename is not traceable to the source log.')

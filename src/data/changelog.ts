@@ -7,6 +7,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.0.20',
+    date: '2026-08-06T11:23:30Z',
+    type: 'fix',
+    notes: [
+      'Manual Issues Update now maps the ACC Type column into the BIM Issues Log Subtype column',
+      'The ACC Category column is intentionally ignored while the current BIM Issues Log continues to use its existing Subtype header',
+      'The workbook regression fixture now verifies the ACC-specific Type-to-Subtype translation for both updated and newly added issues',
+    ],
+  },
+  {
     version: '1.0.19',
     date: '2026-08-06T10:53:08Z',
     type: 'feature',

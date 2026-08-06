@@ -114,6 +114,11 @@ function findHeader(headers: unknown[], aliases: string[]): { name: string; colu
   return { name: String(headers[column] ?? '').trim(), column }
 }
 
+function fieldAliases(field: IssueFieldDefinition, kind: ManualIssueWorkbookKind): string[] {
+  if (kind === 'acc' && field.key === 'subtype') return ['Type', ...field.aliases]
+  return field.aliases
+}
+
 function findLastDataRow(matrix: unknown[][], headerRow: number): number {
   for (let row = matrix.length - 1; row > headerRow; row -= 1) {
     if ((matrix[row] ?? []).some((cell) => String(cell ?? '').trim() !== '')) return row
@@ -138,7 +143,7 @@ function inspectWorksheet(
     const fieldHeaders: Partial<Record<ManualIssueField, string>> = {}
     const fieldColumns: Partial<Record<ManualIssueField, number>> = {}
     ISSUE_FIELDS.forEach((field) => {
-      const match = findHeader(headers, field.aliases)
+      const match = findHeader(headers, fieldAliases(field, kind))
       if (!match) return
       fieldHeaders[field.key] = match.name
       fieldColumns[field.key] = match.column
