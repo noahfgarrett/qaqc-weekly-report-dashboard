@@ -38,8 +38,8 @@ if (!report.filterOptions.statuses.includes('Pending')) throw new Error('Pending
 if (metric('total-opened') !== 2) throw new Error('Pending must count toward Total Issues Opened.')
 if (metric('total-closed') !== 1) throw new Error('Pending must not count toward Total Issues Closed.')
 if (metric('remaining-open') !== 1) throw new Error('Pending must count toward Issues Remaining Open.')
-if (!report.issueTable.some((row) => row.id === 'BIM-100' && row.status === 'Pending')) {
-  throw new Error('Pending is missing from BIM Issues Detail.')
+if (!report.issueTable.some((row) => row.id === 'BIM-100' && row.status === 'Open')) {
+  throw new Error('Pending is not displayed as Open in BIM Issues Detail.')
 }
 
 const pendingOnly = buildReportModel(bundle, mergeFilters({ oac: true, statuses: ['Pending'] }), now)
@@ -64,7 +64,7 @@ try {
     },
   })
   await import(`${pathToFileURL(resolve(outputDirectory, 'pending-status-check.mjs')).href}?t=${Date.now()}`)
-  console.log('Pending status counts as open and remains visible in filters and issue details.')
+  console.log('Pending status counts as open, remains filterable, and displays as Open in issue details.')
 } finally {
   await rm(temporaryDirectory, { recursive: true, force: true })
 }

@@ -384,7 +384,7 @@ function buildIssueTable(
       return {
         id: issue.id,
         subtype: issue.subtype,
-        status: issue.status,
+        status: issue.statusKind === 'pending' ? 'Open' : issue.status,
         title: issue.title,
         contractor: issue.contractor,
         workWeek: issue.createdWeek?.label ?? '',

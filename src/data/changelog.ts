@@ -7,6 +7,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.0.24',
+    date: '2026-08-06T11:59:10Z',
+    type: 'fix',
+    notes: [
+      'Pending BIM issues now display as Open in BIM Issues Detail, including PPTX and PDF exports',
+      'Pending issues continue to count toward Total Issues Opened and Issues Remaining Open across all report metrics',
+      'The Pending status remains available in the Status slicer for precise source-data filtering',
+    ],
+  },
+  {
     version: '1.0.23',
     date: '2026-08-06T11:47:02Z',
     type: 'fix',
