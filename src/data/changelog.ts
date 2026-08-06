@@ -7,6 +7,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.0.22',
+    date: '2026-08-06T11:41:21Z',
+    type: 'fix',
+    notes: [
+      'Manual Issues Update now preserves the original BIM Issues Log Created on value for every existing ID instead of accepting ACC migration dates',
+      'ACC continues to update all other supported fields for existing issues, while genuinely new LotusWorks IDs receive their Created on value from ACC',
+      'Regression coverage reproduces the July 24 Autodesk transfer-date problem and verifies that the original historical date still resolves to its correct work week',
+    ],
+  },
+  {
     version: '1.0.21',
     date: '2026-08-06T11:30:53Z',
     type: 'fix',
