@@ -1,7 +1,7 @@
 {
   "name": "qaqc-weekly-report-dashboard",
   "private": true,
-  "version": "1.0.18",
+  "version": "1.0.19",
   "type": "module",
   "repository": {
     "type": "git",
@@ -12,6 +12,7 @@
     "build": "tsc -b && vite build && node scripts/finalize-build.mjs",
     "preview": "vite preview",
     "typecheck": "tsc -b",
+    "test:manual-issues": "node scripts/verify-manual-issues-update.mjs",
     "test:pending-status": "node scripts/verify-pending-status.mjs"
   },
   "dependencies": {

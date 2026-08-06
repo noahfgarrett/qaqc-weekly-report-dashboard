@@ -33,6 +33,14 @@ import { CHANGELOG, type ChangelogEntry } from '@/data/changelog'
 import { exportReportDeck } from '@/export/pptx'
 import { exportSlidesPdf } from '@/export/pdf'
 import { expandImportFiles, filesFromDrop, importSpreadsheet } from '@/services/fileImport'
+import {
+  buildUpdatedIssueWorkbook,
+  downloadUpdatedIssueWorkbook,
+  prepareIssueWorkbook,
+  reconcileIssueRows,
+  type ManualIssueWorkbookKind,
+  type PreparedIssueWorkbook,
+} from '@/services/manualIssuesUpdate'
 import { clearLegacyConnectionData, loadFilters, saveFilters } from '@/services/storage'
 import { checkForUpdate } from '@/services/updateChecker'
 import { downloadUpdateFile } from '@/services/updateDownload'
@@ -1297,9 +1305,375 @@ function ImportPanel({
   )
 }
 
+function ManualIssueFileSlot({
+  kind,
+  title,
+  workbook,
+  loading,
+  onChoose,
+  onFile,
+  onClear,
+}: {
+  kind: ManualIssueWorkbookKind
+  title: string
+  workbook: PreparedIssueWorkbook | null
+  loading: boolean
+  onChoose: () => void
+  onFile: (file: File) => void
+  onClear: () => void
+}) {
+  const [dragging, setDragging] = useState(false)
+  return (
+    <div
+      className={cx('manual-file-slot', workbook && 'ready', dragging && 'dragging')}
+      onDragEnter={(event) => {
+        event.preventDefault()
+        setDragging(true)
+      }}
+      onDragOver={(event) => event.preventDefault()}
+      onDragLeave={(event) => {
+        if (event.currentTarget === event.target) setDragging(false)
+      }}
+      onDrop={(event) => {
+        event.preventDefault()
+        setDragging(false)
+        const file = event.dataTransfer.files[0]
+        if (file) onFile(file)
+      }}
+    >
+      <div className="manual-file-icon">
+        {workbook ? <CheckCircle2 size={20} /> : <FileSpreadsheet size={20} />}
+      </div>
+      <div className="manual-file-copy">
+        <span>{kind === 'current' ? 'Source' : 'New export'}</span>
+        <strong>{title}</strong>
+        {workbook ? (
+          <small title={workbook.fileName}>
+            {workbook.fileName} · {workbook.rowCount.toLocaleString()} rows
+          </small>
+        ) : (
+          <small>.xlsx, .xls, or .csv</small>
+        )}
+      </div>
+      {workbook ? (
+        <button className="icon-button compact" type="button" onClick={onClear} aria-label={`Remove ${title}`} title="Remove file">
+          <X size={15} />
+        </button>
+      ) : (
+        <button className="button secondary" type="button" onClick={onChoose} disabled={loading}>
+          {loading ? <RefreshCw className="spin" size={16} /> : <Archive size={16} />}
+          Choose file
+        </button>
+      )}
+    </div>
+  )
+}
+
+function ManualIssuesUpdate() {
+  const currentInputRef = useRef<HTMLInputElement>(null)
+  const accInputRef = useRef<HTMLInputElement>(null)
+  const [current, setCurrent] = useState<PreparedIssueWorkbook | null>(null)
+  const [acc, setAcc] = useState<PreparedIssueWorkbook | null>(null)
+  const [loading, setLoading] = useState<ManualIssueWorkbookKind | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [downloadedFile, setDownloadedFile] = useState<string | null>(null)
+  const [summaryOpen, setSummaryOpen] = useState(false)
+
+  const analysis = useMemo(
+    () => (current && acc ? reconcileIssueRows(current, acc) : null),
+    [current, acc],
+  )
+  const issueChanges = useMemo(
+    () => analysis
+      ? [
+          ...analysis.updatedIssues.map((issue) => ({ issue, action: 'Updated' as const })),
+          ...analysis.newIssues.map((issue) => ({ issue, action: 'Added' as const })),
+        ]
+      : [],
+    [analysis],
+  )
+
+  useEffect(() => {
+    if (analysis) setSummaryOpen(true)
+  }, [analysis])
+
+  async function loadFile(file: File, kind: ManualIssueWorkbookKind): Promise<void> {
+    setLoading(kind)
+    setError(null)
+    setDownloadedFile(null)
+    try {
+      const workbook = await prepareIssueWorkbook(file, kind)
+      if (kind === 'current') setCurrent(workbook)
+      else setAcc(workbook)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'The issue workbook could not be loaded.')
+    } finally {
+      setLoading(null)
+    }
+  }
+
+  function downloadUpdatedLog(): void {
+    if (!current || !analysis || issueChanges.length === 0) return
+    setError(null)
+    try {
+      const output = buildUpdatedIssueWorkbook(current, analysis)
+      downloadUpdatedIssueWorkbook(output)
+      setDownloadedFile(output.fileName)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'The updated BIM Issues Log could not be created.')
+    }
+  }
+
+  return (
+    <section className="manual-update-workspace">
+      <input
+        ref={currentInputRef}
+        className="file-input"
+        type="file"
+        accept=".xls,.xlsx,.csv"
+        onChange={(event) => {
+          const file = event.target.files?.[0]
+          if (file) void loadFile(file, 'current')
+          event.target.value = ''
+        }}
+      />
+      <input
+        ref={accInputRef}
+        className="file-input"
+        type="file"
+        accept=".xls,.xlsx,.csv"
+        onChange={(event) => {
+          const file = event.target.files?.[0]
+          if (file) void loadFile(file, 'acc')
+          event.target.value = ''
+        }}
+      />
+
+      <div className="manual-update-heading">
+        <div>
+          <span>ISSUE RECONCILIATION</span>
+          <h2>Manual Issues Update</h2>
+        </div>
+        <div className="secure-mark">
+          <ShieldCheck size={14} />
+          Local processing
+        </div>
+      </div>
+
+      {error && (
+        <div className="error-banner manual-error">
+          <AlertCircle size={16} />
+          <span>{error}</span>
+          <button type="button" onClick={() => setError(null)}>Dismiss</button>
+        </div>
+      )}
+
+      <div className="manual-file-grid">
+        <ManualIssueFileSlot
+          kind="current"
+          title="Current BIM Issues Log"
+          workbook={current}
+          loading={loading === 'current'}
+          onChoose={() => currentInputRef.current?.click()}
+          onFile={(file) => void loadFile(file, 'current')}
+          onClear={() => {
+            setCurrent(null)
+            setDownloadedFile(null)
+          }}
+        />
+        <ManualIssueFileSlot
+          kind="acc"
+          title="ACC Issues Export"
+          workbook={acc}
+          loading={loading === 'acc'}
+          onChoose={() => accInputRef.current?.click()}
+          onFile={(file) => void loadFile(file, 'acc')}
+          onClear={() => {
+            setAcc(null)
+            setDownloadedFile(null)
+          }}
+        />
+      </div>
+
+      {analysis ? (
+        <>
+          <div className="manual-summary-grid">
+            <article>
+              <span>Current log</span>
+              <strong>{analysis.currentRows.toLocaleString()}</strong>
+              <small>existing rows</small>
+            </article>
+            <article>
+              <span>Ready to update</span>
+              <strong>{analysis.updatedIssues.length.toLocaleString()}</strong>
+              <small>existing IDs changed</small>
+            </article>
+            <article className="new-issues">
+              <span>Ready to add</span>
+              <strong>{analysis.newIssues.length.toLocaleString()}</strong>
+              <small>new LotusWorks IDs</small>
+            </article>
+            <article>
+              <span>Already current</span>
+              <strong>{analysis.unchangedExistingIds.toLocaleString()}</strong>
+              <small>matching IDs unchanged</small>
+            </article>
+          </div>
+
+          <div className="manual-results-panel">
+            <div className="manual-results-header">
+              <div>
+                <h3>LotusWorks Issue Changes</h3>
+                <p>
+                  {analysis.excludedOtherOwners.toLocaleString()} other-owner rows excluded ·{' '}
+                  {(analysis.skippedDuplicateIds + analysis.skippedMissingIds).toLocaleString()} duplicate or missing IDs skipped
+                </p>
+              </div>
+              <div className="manual-results-actions">
+                <button className="button secondary" type="button" onClick={() => setSummaryOpen(true)}>
+                  <Table2 size={16} />
+                  Review Changes
+                </button>
+                <button
+                  className="button primary"
+                  type="button"
+                  disabled={issueChanges.length === 0}
+                  onClick={downloadUpdatedLog}
+                >
+                  <Download size={16} />
+                  Download Updated Log
+                </button>
+              </div>
+            </div>
+
+            {issueChanges.length > 0 ? (
+              <div className="manual-table-scroll">
+                <table className="manual-issues-table">
+                  <thead>
+                    <tr>
+                      <th>Change</th>
+                      <th>ID</th>
+                      <th>Title</th>
+                      <th>Status</th>
+                      <th>Subtype</th>
+                      <th>Created on</th>
+                      <th>Updated on</th>
+                      <th>Due date</th>
+                      <th>Contractor</th>
+                      <th>Discipline</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {issueChanges.map(({ issue, action }) => (
+                      <tr key={`${action}-${issue.id}-${issue.sourceRow}`}>
+                        <td><span className={cx('manual-change-type', action.toLowerCase())}>{action}</span></td>
+                        <td><strong>{issue.id}</strong></td>
+                        <td>{issue.title || '—'}</td>
+                        <td><span className="manual-status">{issue.status || 'Open'}</span></td>
+                        <td>{issue.subtype || '—'}</td>
+                        <td>{issue.createdOn || '—'}</td>
+                        <td>{issue.updatedOn || '—'}</td>
+                        <td>{issue.dueDate || '—'}</td>
+                        <td>{issue.contractor || '—'}</td>
+                        <td>{issue.discipline || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="manual-empty-result">
+                <CheckCircle2 size={24} />
+                <strong>The BIM Issues Log is already current.</strong>
+              </div>
+            )}
+
+            {downloadedFile && (
+              <div className="manual-download-success">
+                <CheckCircle2 size={15} />
+                Downloaded {downloadedFile}
+              </div>
+            )}
+          </div>
+        </>
+      ) : (
+        <div className="manual-waiting-state">
+          <GitBranch size={30} />
+          <strong>Two files needed</strong>
+          <span>The comparison appears here when both files are ready.</span>
+        </div>
+      )}
+
+      <Modal open={summaryOpen && Boolean(analysis)} title="Update Summary" onClose={() => setSummaryOpen(false)} wide>
+        {analysis && (
+          <div className="manual-summary-modal">
+            <div className={cx('manual-summary-outcome', issueChanges.length === 0 && 'current')}>
+              <div>
+                {issueChanges.length === 0 ? <CheckCircle2 size={22} /> : <GitBranch size={22} />}
+              </div>
+              <span>
+                <strong>
+                  {issueChanges.length === 0
+                    ? 'The BIM Issues Log is already current'
+                    : `${issueChanges.length.toLocaleString()} ${issueChanges.length === 1 ? 'change' : 'changes'} ready`}
+                </strong>
+                <small>
+                  {analysis.updatedIssues.length.toLocaleString()} existing updated ·{' '}
+                  {analysis.newIssues.length.toLocaleString()} new LotusWorks {analysis.newIssues.length === 1 ? 'issue' : 'issues'} added
+                </small>
+              </span>
+            </div>
+
+            <div className="manual-modal-stats">
+              <span><strong>{analysis.updatedIssues.length.toLocaleString()}</strong> existing IDs updated</span>
+              <span><strong>{analysis.newIssues.length.toLocaleString()}</strong> new IDs added</span>
+              <span><strong>{analysis.unchangedExistingIds.toLocaleString()}</strong> already current</span>
+              <span><strong>{analysis.excludedOtherOwners.toLocaleString()}</strong> other owners excluded</span>
+            </div>
+
+            {issueChanges.length > 0 && (
+              <div className="manual-modal-list">
+                {issueChanges.slice(0, 8).map(({ issue, action }) => (
+                  <div key={`summary-${action}-${issue.id}-${issue.sourceRow}`}>
+                    <strong>{issue.id}</strong>
+                    <span>{issue.title || 'Untitled issue'}</span>
+                    <small title={action === 'Updated' ? issue.changedFields.join(', ') : 'New issue'}>
+                      {action === 'Updated' ? issue.changedFields.join(', ') : 'Added'}
+                    </small>
+                  </div>
+                ))}
+                {issueChanges.length > 8 && (
+                  <p>+{(issueChanges.length - 8).toLocaleString()} more changes in the full review table</p>
+                )}
+              </div>
+            )}
+
+            <div className="manual-modal-actions">
+              {downloadedFile && (
+                <span><CheckCircle2 size={14} /> Downloaded {downloadedFile}</span>
+              )}
+              <button className="button secondary" type="button" onClick={() => setSummaryOpen(false)}>Close</button>
+              <button
+                className="button primary"
+                type="button"
+                disabled={issueChanges.length === 0}
+                onClick={downloadUpdatedLog}
+              >
+                <Download size={16} />
+                Download Updated Log
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+    </section>
+  )
+}
+
 export default function App() {
   const [bundle, setBundle] = useState<SheetBundle>(EMPTY_BUNDLE)
   const [filters, setFilters] = useState<ReportFilters>(() => mergeFilters(loadFilters()))
+  const [workspaceTab, setWorkspaceTab] = useState<'report' | 'manual'>('report')
   const [activeSlide, setActiveSlide] = useState<'overview' | 'issues' | 'field'>('overview')
   const [imports, setImports] = useState<Partial<Record<SheetRole, ImportedSheetFile>>>({})
   const [importing, setImporting] = useState(false)
@@ -1483,22 +1857,43 @@ export default function App() {
           </div>
           <div>
             <h1>QA/QC Intelligence</h1>
-            <p>{hasReport ? `Weekly report through ${report.reportWeek.label}` : 'Import weekly exports to generate a report'}</p>
+            <p>
+              {workspaceTab === 'manual'
+                ? 'Reconcile LotusWorks issues from ACC'
+                : hasReport
+                  ? `Weekly report through ${report.reportWeek.label}`
+                  : 'Import weekly exports to generate a report'}
+            </p>
           </div>
         </div>
         <div className="header-pills">
-          <span className={cx('live-pill', filesReady && 'connected')}>
-            <FileSpreadsheet size={14} />
-            {bundle.source === 'demo' ? 'Preview Layout' : `${importCount}/4 Files Ready`}
-          </span>
-          <span>
-            <CalendarClock size={14} />
-            Current {report.currentWeek.label}
-          </span>
-          <span>
-            <Gauge size={14} />
-            GC Safe Export
-          </span>
+          {workspaceTab === 'manual' ? (
+            <>
+              <span className="connected">
+                <ShieldCheck size={14} />
+                LotusWorks only
+              </span>
+              <span>
+                <GitBranch size={14} />
+                ID-safe merge
+              </span>
+            </>
+          ) : (
+            <>
+              <span className={cx('live-pill', filesReady && 'connected')}>
+                <FileSpreadsheet size={14} />
+                {bundle.source === 'demo' ? 'Preview Layout' : `${importCount}/4 Files Ready`}
+              </span>
+              <span>
+                <CalendarClock size={14} />
+                Current {report.currentWeek.label}
+              </span>
+              <span>
+                <Gauge size={14} />
+                GC Safe Export
+              </span>
+            </>
+          )}
         </div>
         <div className="header-actions">
           <button
@@ -1513,63 +1908,78 @@ export default function App() {
             Updates
             {updateInfo && <span className="update-badge">v{updateInfo.version}</span>}
           </button>
-          {hasReport && (
-            <button
-              className="icon-button labeled"
-              type="button"
-              onClick={() => setSheetPanelOpen((prev) => !prev)}
-              aria-pressed={sheetPanelOpen}
-            >
-              {sheetPanelOpen ? <PanelLeftClose size={16} /> : <PanelLeftOpen size={16} />}
-              {sheetPanelOpen ? 'Hide Files' : 'Files'}
-            </button>
+          {workspaceTab === 'report' && (
+            <>
+              {hasReport && (
+                <button
+                  className="icon-button labeled"
+                  type="button"
+                  onClick={() => setSheetPanelOpen((prev) => !prev)}
+                  aria-pressed={sheetPanelOpen}
+                >
+                  {sheetPanelOpen ? <PanelLeftClose size={16} /> : <PanelLeftOpen size={16} />}
+                  {sheetPanelOpen ? 'Hide Files' : 'Files'}
+                </button>
+              )}
+              <button className="icon-button labeled" type="button" onClick={() => fileInputRef.current?.click()} disabled={importing}>
+                {importing ? <RefreshCw size={16} className="spin" /> : <Archive size={16} />}
+                Import ZIP
+              </button>
+              <button
+                className="button primary"
+                type="button"
+                disabled={exporting || pdfExporting || !hasReport}
+                onClick={async () => {
+                  setExporting(true)
+                  try {
+                    await exportReportDeck(report)
+                  } catch (err) {
+                    setError(err instanceof Error ? `PowerPoint export failed: ${err.message}` : 'PowerPoint export failed.')
+                  } finally {
+                    await waitForExportCooldown()
+                    setExporting(false)
+                  }
+                }}
+              >
+                {exporting ? <RefreshCw size={16} className="spin" /> : <Download size={16} />}
+                Export PPTX
+              </button>
+              <button
+                className="button primary pdf-button"
+                type="button"
+                disabled={exporting || pdfExporting || !hasReport}
+                onClick={async () => {
+                  setPdfExporting(true)
+                  try {
+                    await exportSlidesPdf(report)
+                  } catch (err) {
+                    setError(err instanceof Error ? `PDF export failed: ${err.message}` : 'PDF export failed.')
+                  } finally {
+                    await waitForExportCooldown()
+                    setPdfExporting(false)
+                  }
+                }}
+              >
+                {pdfExporting ? <RefreshCw size={16} className="spin" /> : <Download size={16} />}
+                Export PDF
+              </button>
+            </>
           )}
-          <button className="icon-button labeled" type="button" onClick={() => fileInputRef.current?.click()} disabled={importing}>
-            {importing ? <RefreshCw size={16} className="spin" /> : <Archive size={16} />}
-            Import ZIP
-          </button>
-          <button
-            className="button primary"
-            type="button"
-            disabled={exporting || pdfExporting || !hasReport}
-            onClick={async () => {
-              setExporting(true)
-              try {
-                await exportReportDeck(report)
-              } catch (err) {
-                setError(err instanceof Error ? `PowerPoint export failed: ${err.message}` : 'PowerPoint export failed.')
-              } finally {
-                await waitForExportCooldown()
-                setExporting(false)
-              }
-            }}
-          >
-            {exporting ? <RefreshCw size={16} className="spin" /> : <Download size={16} />}
-            Export PPTX
-          </button>
-          <button
-            className="button primary pdf-button"
-            type="button"
-            disabled={exporting || pdfExporting || !hasReport}
-            onClick={async () => {
-              setPdfExporting(true)
-              try {
-                await exportSlidesPdf(report)
-              } catch (err) {
-                setError(err instanceof Error ? `PDF export failed: ${err.message}` : 'PDF export failed.')
-              } finally {
-                await waitForExportCooldown()
-                setPdfExporting(false)
-              }
-            }}
-          >
-            {pdfExporting ? <RefreshCw size={16} className="spin" /> : <Download size={16} />}
-            Export PDF
-          </button>
         </div>
       </header>
 
-      {hasReport && (
+      <nav className="workspace-tabs" aria-label="QA/QC tools">
+        <button className={cx(workspaceTab === 'report' && 'active')} type="button" onClick={() => setWorkspaceTab('report')}>
+          <Gauge size={16} />
+          Weekly Report
+        </button>
+        <button className={cx(workspaceTab === 'manual' && 'active')} type="button" onClick={() => setWorkspaceTab('manual')}>
+          <GitBranch size={16} />
+          Manual Issues Update
+        </button>
+      </nav>
+
+      {workspaceTab === 'report' && hasReport && (
         <section className="filter-strip">
           <button
             className={cx('oac-toggle', filters.oac && 'on')}
@@ -1618,7 +2028,7 @@ export default function App() {
         </section>
       )}
 
-      {error && (
+      {workspaceTab === 'report' && error && (
         <div className="error-banner">
           <AlertCircle size={16} />
           <span>{error}</span>
@@ -1626,51 +2036,57 @@ export default function App() {
         </div>
       )}
 
-      <main className={cx('workspace', hasReport && !showSheetPanel && 'workspace-expanded')}>
-        {showSheetPanel && (
-          <ImportPanel
-            imports={imports}
-            onChoose={() => fileInputRef.current?.click()}
-            onChooseFolder={() => folderInputRef.current?.click()}
-            onRemove={removeImport}
-            onClear={clearImports}
-            importing={importing}
-          />
+      <main className={cx('workspace', workspaceTab === 'manual' && 'workspace-manual', hasReport && !showSheetPanel && 'workspace-expanded')}>
+        {workspaceTab === 'manual' ? (
+          <ManualIssuesUpdate />
+        ) : (
+          <>
+            {showSheetPanel && (
+              <ImportPanel
+                imports={imports}
+                onChoose={() => fileInputRef.current?.click()}
+                onChooseFolder={() => folderInputRef.current?.click()}
+                onRemove={removeImport}
+                onClear={clearImports}
+                importing={importing}
+              />
+            )}
+            <section className="report-workspace">
+              {hasReport ? (
+                <>
+                  <nav className="slide-tabs">
+                    <button className={cx(activeSlide === 'overview' && 'active')} type="button" onClick={() => setActiveSlide('overview')}>
+                      <Gauge size={15} />
+                      Overview
+                    </button>
+                    <button className={cx(activeSlide === 'issues' && 'active')} type="button" onClick={() => setActiveSlide('issues')}>
+                      <Table2 size={15} />
+                      Issue Detail
+                    </button>
+                    <button className={cx(activeSlide === 'field' && 'active')} type="button" onClick={() => setActiveSlide('field')}>
+                      <ClipboardCheck size={15} />
+                      Inspections & Welding
+                    </button>
+                  </nav>
+                  {slide}
+                </>
+              ) : (
+                <ConnectFirst
+                  imports={imports}
+                  importing={importing}
+                  onChoose={() => fileInputRef.current?.click()}
+                  onChooseFolder={() => folderInputRef.current?.click()}
+                  onDrop={(dataTransfer) => void handleDrop(dataTransfer)}
+                  onPreview={() => {
+                    setBundle(PREVIEW_BUNDLE)
+                    setActiveSlide('overview')
+                    setSheetPanelOpen(false)
+                  }}
+                />
+              )}
+            </section>
+          </>
         )}
-        <section className="report-workspace">
-          {hasReport ? (
-            <>
-              <nav className="slide-tabs">
-                <button className={cx(activeSlide === 'overview' && 'active')} type="button" onClick={() => setActiveSlide('overview')}>
-                  <Gauge size={15} />
-                  Overview
-                </button>
-                <button className={cx(activeSlide === 'issues' && 'active')} type="button" onClick={() => setActiveSlide('issues')}>
-                  <Table2 size={15} />
-                  Issue Detail
-                </button>
-                <button className={cx(activeSlide === 'field' && 'active')} type="button" onClick={() => setActiveSlide('field')}>
-                  <ClipboardCheck size={15} />
-                  Inspections & Welding
-                </button>
-              </nav>
-              {slide}
-            </>
-          ) : (
-            <ConnectFirst
-              imports={imports}
-              importing={importing}
-              onChoose={() => fileInputRef.current?.click()}
-              onChooseFolder={() => folderInputRef.current?.click()}
-              onDrop={(dataTransfer) => void handleDrop(dataTransfer)}
-              onPreview={() => {
-                setBundle(PREVIEW_BUNDLE)
-                setActiveSlide('overview')
-                setSheetPanelOpen(false)
-              }}
-            />
-          )}
-        </section>
       </main>
 
       <UpdateModal

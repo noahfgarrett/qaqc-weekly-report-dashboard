@@ -7,6 +7,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.0.19',
+    date: '2026-08-06T10:53:08Z',
+    type: 'feature',
+    notes: [
+      'Added a dedicated Manual Issues Update workspace for reconciling a current BIM Issues Log against the replacement ACC export',
+      'Every ID already present in the BIM Issues Log is refreshed from ACC even when Autodesk transfer ownership replaced the original creator, while genuinely new IDs are added only when Created By contains LotusWorks',
+      'The merge updates only the nine dashboard fields, preserves existing values when ACC sends a blank cell, and prevents duplicate or missing IDs from entering the log',
+      'A review table and automatic Update Summary modal show updated, added, unchanged, and excluded records before the versioned workbook downloads locally',
+    ],
+  },
+  {
     version: '1.0.18',
     date: '2026-08-05T18:06:48Z',
     type: 'fix',
