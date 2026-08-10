@@ -7,6 +7,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.0.27',
+    date: '2026-08-10T15:05:41Z',
+    type: 'fix',
+    notes: [
+      'Added first-class support for BIM360_Created By, BIM360_Created On, and BIM360_Closed On legacy export columns',
+      'Legacy LotusWorks ownership and historical dates now take priority, with the existing ACC method retained when all three legacy cells are blank',
+      'Closed legacy issues without BIM360_Closed On use Updated on as their closure date, while unclosed issues remain open',
+    ],
+  },
+  {
     version: '1.0.26',
     date: '2026-08-06T12:50:09Z',
     type: 'fix',

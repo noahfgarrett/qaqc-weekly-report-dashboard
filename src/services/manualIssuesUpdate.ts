@@ -33,6 +33,9 @@ const ISSUE_FIELDS: IssueFieldDefinition[] = [
 ]
 
 const CREATOR_ALIASES = ['Created By', 'Issue Owner']
+const LEGACY_CREATED_BY_ALIASES = ['BIM360_Created By', 'BIM360 Created By']
+const LEGACY_CREATED_ON_ALIASES = ['BIM360_Created On', 'BIM360 Created On']
+const LEGACY_CLOSED_ON_ALIASES = ['BIM360_Closed On', 'BIM360 Closed On']
 const SUPPORTED_EXTENSIONS = ['.xls', '.xlsx', '.csv']
 const SHORT_DATE_FORMAT = 'm/d/yy'
 const DATE_FIELDS = new Set<ManualIssueField>(['createdOn', 'updatedOn', 'dueDate'])
@@ -94,7 +97,15 @@ interface WorksheetCandidate {
   fieldHeaders: Partial<Record<ManualIssueField, string>>
   fieldColumns: Partial<Record<ManualIssueField, number>>
   creatorHeader?: string
+  legacyCreatorHeader?: string
   score: number
+}
+
+interface AccIssueValues {
+  values: Record<ManualIssueField, unknown>
+  owner: unknown
+  hasLegacyCreatedOn: boolean
+  hasAuthoritativeClosedOn: boolean
 }
 
 function normalized(value: unknown): string {
@@ -153,8 +164,9 @@ function inspectWorksheet(
     })
     const creatorAliases = kind === 'current' ? [...CREATOR_ALIASES].reverse() : CREATOR_ALIASES
     const creator = findHeader(headers, creatorAliases)
+    const legacyCreator = findHeader(headers, LEGACY_CREATED_BY_ALIASES)
     const matchedFields = Object.keys(fieldHeaders).length
-    const score = matchedFields * 100 + (kind === 'acc' && creator ? 150 : 0)
+    const score = matchedFields * 100 + (kind === 'acc' && (creator || legacyCreator) ? 150 : 0)
     if (best && best.score >= score) return
 
     const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet, {
@@ -173,6 +185,7 @@ function inspectWorksheet(
       fieldHeaders,
       fieldColumns,
       creatorHeader: creator?.name,
+      legacyCreatorHeader: legacyCreator?.name,
       score,
     }
   })
@@ -221,8 +234,8 @@ export async function prepareIssueWorkbook(
   const candidate = candidates[0]
   if (!candidate) throw new Error(`${file.name}: no populated worksheet was found.`)
   const fields = requireFieldMap(candidate, file.name)
-  if (kind === 'acc' && !candidate.creatorHeader) {
-    throw new Error(`${file.name}: missing Created By. Issue Owner is also accepted.`)
+  if (kind === 'acc' && !candidate.creatorHeader && !candidate.legacyCreatorHeader) {
+    throw new Error(`${file.name}: missing BIM360_Created By or Created By. Issue Owner is also accepted.`)
   }
 
   return {
@@ -246,6 +259,14 @@ function rowValue(
   field: ManualIssueField,
 ): unknown {
   return row[workbook.fieldHeaders[field]] ?? ''
+}
+
+function valueByAliases(row: Record<string, unknown>, aliases: string[]): unknown {
+  const values = new Map(Object.entries(row).map(([key, value]) => [normalized(key), value]))
+  for (const alias of aliases) {
+    if (values.has(normalized(alias))) return values.get(normalized(alias)) ?? ''
+  }
+  return ''
 }
 
 function displayValue(value: unknown): string {
@@ -294,6 +315,32 @@ function comparable(value: unknown): string | number | boolean {
   return String(value ?? '').trim()
 }
 
+function isClosedStatus(value: unknown): boolean {
+  const status = normalized(value)
+  return status === 'closed' || status === 'complete' || status === 'completed'
+}
+
+function valuesFromAccRow(acc: PreparedIssueWorkbook, row: Record<string, unknown>): AccIssueValues {
+  const values = valuesFromRow(acc, row)
+  const legacyCreatedBy = valueByAliases(row, LEGACY_CREATED_BY_ALIASES)
+  const legacyCreatedOn = valueByAliases(row, LEGACY_CREATED_ON_ALIASES)
+  const legacyClosedOn = valueByAliases(row, LEGACY_CLOSED_ON_ALIASES)
+  const hasLegacyData = !isBlank(legacyCreatedBy) || !isBlank(legacyCreatedOn) || !isBlank(legacyClosedOn)
+  const hasLegacyCreatedOn = !isBlank(legacyCreatedOn)
+  const hasLegacyClosedOn = !isBlank(legacyClosedOn)
+
+  if (hasLegacyCreatedOn) values.createdOn = legacyCreatedOn
+  if (hasLegacyClosedOn) values.updatedOn = legacyClosedOn
+
+  return {
+    values,
+    owner: hasLegacyData ? legacyCreatedBy : row[acc.creatorHeader as string],
+    hasLegacyCreatedOn,
+    hasAuthoritativeClosedOn: hasLegacyClosedOn
+      || (hasLegacyData && isClosedStatus(values.status) && !isBlank(values.updatedOn)),
+  }
+}
+
 export function reconcileIssueRows(
   current: PreparedIssueWorkbook,
   acc: PreparedIssueWorkbook,
@@ -315,7 +362,8 @@ export function reconcileIssueRows(
   let skippedMissingIds = 0
 
   acc.rows.forEach((row) => {
-    const incomingValues = valuesFromRow(acc, row)
+    const accValues = valuesFromAccRow(acc, row)
+    const incomingValues = accValues.values
     const key = idKey(incomingValues.id)
     if (!key) {
       skippedMissingIds += 1
@@ -328,7 +376,7 @@ export function reconcileIssueRows(
     processedAccIds.add(key)
 
     const currentRow = currentById.get(key)
-    const accOwnerIsLotusWorks = normalized(row[acc.creatorHeader as string]).includes('lotusworks')
+    const accOwnerIsLotusWorks = normalized(accValues.owner).includes('lotusworks')
     if (!currentRow && !accOwnerIsLotusWorks) {
       excludedOtherOwners += 1
       return
@@ -351,8 +399,8 @@ export function reconcileIssueRows(
       const incoming = incomingValues[field.key]
       if (
         field.key === 'id'
-        || field.key === 'createdOn'
-        || field.key === 'updatedOn'
+        || (field.key === 'createdOn' && !accValues.hasLegacyCreatedOn)
+        || (field.key === 'updatedOn' && !accValues.hasAuthoritativeClosedOn)
         || isBlank(incoming)
       ) return
       if (comparable(currentValues[field.key]) !== comparable(incoming)) {

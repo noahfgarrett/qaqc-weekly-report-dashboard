@@ -108,12 +108,31 @@ function normalizeStatus(status: string): IssueStatus {
   return 'open'
 }
 
+function legacyIssueValue(row: Record<string, unknown>, field: 'createdBy' | 'createdOn' | 'closedOn'): string {
+  if (field === 'createdBy') return value(row, ['BIM360_Created By', 'BIM360 Created By'])
+  if (field === 'createdOn') return value(row, ['BIM360_Created On', 'BIM360 Created On'])
+  return value(row, ['BIM360_Closed On', 'BIM360 Closed On'])
+}
+
+function shouldIncludeIssue(row: Record<string, unknown>): boolean {
+  const legacyCreatedBy = legacyIssueValue(row, 'createdBy').trim()
+  const hasLegacyData = Boolean(
+    legacyCreatedBy
+    || legacyIssueValue(row, 'createdOn').trim()
+    || legacyIssueValue(row, 'closedOn').trim(),
+  )
+  if (!hasLegacyData) return true
+  return legacyCreatedBy.toLowerCase().includes('lotusworks')
+}
+
 function normalizeIssue(row: Record<string, unknown>): IssueRecord {
-  const createdOn = parseDate(value(row, ['Created On', 'Created', 'Date Created']))
-  const updatedOn = parseDate(value(row, ['Updated On', 'Updated', 'Closed On', 'Date Closed']))
   const rawStatus = value(row, ['Status']).trim() || 'Open'
   const statusKind = normalizeStatus(rawStatus)
   const status = statusKind === 'pending' ? 'Pending' : rawStatus
+  const legacyCreatedOn = legacyIssueValue(row, 'createdOn').trim()
+  const legacyClosedOn = legacyIssueValue(row, 'closedOn').trim()
+  const createdOn = parseDate(legacyCreatedOn || value(row, ['Created On', 'Created', 'Date Created']))
+  const updatedOn = parseDate(legacyClosedOn || value(row, ['Updated On', 'Updated', 'Closed On', 'Date Closed']))
   return {
     id: value(row, ['ID', 'Issue ID', 'BIM ID']) || String(row.__rowNumber ?? row.__rowId ?? ''),
     status,
@@ -455,7 +474,7 @@ export function buildReportModel(
   const previousReport = previousWorkWeek(reportWeek)
   const cutoffDate = filtersInput.oac ? workWeekEnd(reportWeek) : now
 
-  const allIssues = bundle.sheets.bimIssues.rows.map(normalizeIssue)
+  const allIssues = bundle.sheets.bimIssues.rows.filter(shouldIncludeIssue).map(normalizeIssue)
   const allMechanical = bundle.sheets.mechanical.rows.map(normalizeInspection)
   const allElectrical = bundle.sheets.electrical.rows.map(normalizeInspection)
   const allWelds = bundle.sheets.welding.rows.map(normalizeWeld)

@@ -56,12 +56,14 @@ const strictDetailBundle = {
       id: 'bim-strict-detail',
       name: 'BIM Issues Log',
       rows: [
-        { ID: '1018', Status: 'Pending', 'Created On': '2026-07-24', 'Updated On': '2026-07-31' },
-        { ID: '1019', Status: 'Pending', 'Created On': '2026-07-29', 'Updated On': '2026-07-31' },
-        { ID: '1020', Status: 'Closed', 'Created On': '2026-07-01', 'Updated On': '2026-07-31' },
-        { ID: '1021', Status: 'Closed', 'Created On': '2026-07-29', 'Updated On': '2026-07-31' },
-        { ID: '1022', Status: 'Closed', 'Created On': '2026-07-01', 'Updated On': '2026-08-04' },
-        { ID: '999', Status: 'Open', 'Created On': '2026-04-24', 'Updated On': '2026-07-31' },
+        { ID: '1018', Status: 'Pending', 'Created On': '2026-07-24', 'Updated On': '2026-07-31', 'BIM360_Created By': 'LotusWorks', 'BIM360_Created On': '2026-07-24', 'BIM360_Closed On': '' },
+        { ID: '1019', Status: 'Pending', 'Created On': '2026-07-24', 'Updated On': '2026-07-31', 'BIM360_Created By': 'LotusWorks', 'BIM360_Created On': '2026-07-29', 'BIM360_Closed On': '' },
+        { ID: '1020', Status: 'Closed', 'Created On': '2026-07-24', 'Updated On': '2026-07-24', 'BIM360_Created By': 'LotusWorks', 'BIM360_Created On': '2026-07-01', 'BIM360_Closed On': '2026-07-31' },
+        { ID: '1021', Status: 'Closed', 'Created On': '2026-07-24', 'Updated On': '2026-07-24', 'BIM360_Created By': 'LotusWorks', 'BIM360_Created On': '2026-07-29', 'BIM360_Closed On': '2026-07-31' },
+        { ID: '1022', Status: 'Closed', 'Created On': '2026-07-24', 'Updated On': '2026-08-04', 'BIM360_Created By': 'LotusWorks', 'BIM360_Created On': '2026-07-01', 'BIM360_Closed On': '' },
+        { ID: '1023', Status: 'Pending', 'Created On': '2026-07-30', 'Updated On': '2026-07-31', 'Created By': 'LotusWorks', 'BIM360_Created By': '', 'BIM360_Created On': '', 'BIM360_Closed On': '' },
+        { ID: '2000', Status: 'Open', 'Created On': '2026-07-29', 'Updated On': '2026-07-31', 'Created By': 'LotusWorks', 'BIM360_Created By': 'Outside Contractor', 'BIM360_Created On': '2026-07-29', 'BIM360_Closed On': '' },
+        { ID: '999', Status: 'Open', 'Created On': '2026-07-24', 'Updated On': '2026-07-31', 'BIM360_Created By': 'LotusWorks', 'BIM360_Created On': '2026-04-24', 'BIM360_Closed On': '' },
       ],
     },
   },
@@ -75,7 +77,7 @@ if (strictDetailReport.reportWeek.label !== "WW31'2026") {
   throw new Error('The strict issue-detail regression is not using the expected reporting week.')
 }
 const strictIds = strictDetailReport.issueTable.map((row) => row.id)
-if (strictIds.join(',') !== '1022,1021,1020,1019') {
+if (strictIds.join(',') !== '1023,1022,1021,1020,1019') {
   throw new Error('BIM Issues Detail contains rows outside the four report activity cards.')
 }
 const expectedGroups = new Map([
@@ -83,6 +85,7 @@ const expectedGroups = new Map([
   ['1020', 'Closed in Report Week'],
   ['1021', 'Opened + Closed in Report Week'],
   ['1022', 'Closed This Week'],
+  ['1023', 'Opened in Report Week'],
 ])
 strictDetailReport.issueTable.forEach((row) => {
   if (row.group !== expectedGroups.get(row.id)) {
@@ -91,6 +94,13 @@ strictDetailReport.issueTable.forEach((row) => {
 })
 if (strictDetailReport.issueTable.find((row) => row.id === '1019')?.status !== 'Open') {
   throw new Error('A reporting-week Pending issue must display as Open.')
+}
+if (strictDetailReport.issueTable.some((row) => row.id === '2000')) {
+  throw new Error('Legacy ownership did not take priority over the standard Created By field.')
+}
+const strictMetric = (id) => strictDetailReport.kpis.find((item) => item.id === id)?.rawValue
+if (strictMetric('total-opened') !== 7 || strictMetric('total-closed') !== 2 || strictMetric('remaining-open') !== 5) {
+  throw new Error('Legacy ownership and date priority did not propagate through dashboard metrics.')
 }
 `
 

@@ -36,12 +36,15 @@ const currentBytes = workbookBytes([
 ])
 const accHeaders = issueHeaders.map((header) => header === 'Subtype' ? 'Type' : header)
 const accBytes = workbookBytes([
-  [...accHeaders, 'Category', 'Created By', 'Created By (Company)'],
-  ['BIM-100', 'Transferred existing issue', 'Closed', 'Access', '2026-07-24', '2026-07-24', '2026-07-05', '', 'BIM', 'Coordination', 'Peter Autodesk', 'Other'],
-  ['BIM-1001', 'New LotusWorks issue', 'Pending', 'Clearance', '2026-07-08', '', '2026-07-20', 'Trade B', 'Electrical', 'Field', 'Jamie Doe - LotusWorks', 'Other'],
-  ['bim-1001', 'Duplicate export row', 'Pending', 'Clearance', '2026-07-08', '', '2026-07-20', 'Trade B', 'Electrical', 'Field', 'LotusWorks', 'Other'],
-  ['BIM-102', 'Other owner issue', 'Open', 'Quality', '2026-07-09', '', '', 'Trade C', 'Mechanical', 'Field', 'Outside Contractor', 'LotusWorks'],
-  ['', 'Missing ID', 'Open', 'Quality', '2026-07-09', '', '', '', 'Mechanical', 'Field', 'LotusWorks', 'Other'],
+  [...accHeaders, 'Category', 'Created By', 'Created By (Company)', 'BIM360_Created By', 'BIM360_Created On', 'BIM360_Closed On'],
+  ['BIM-100', 'Transferred existing issue', 'Closed', 'Access', '2026-07-24', '2026-07-24', '2026-07-05', '', 'BIM', 'Coordination', 'Peter Autodesk', 'Other', '', '', ''],
+  ['BIM-950', 'Legacy existing issue', 'Closed', 'Quality', '2026-07-24', '2026-07-31', '2026-07-01', 'Trade C', 'Mechanical', 'Field', 'Peter Autodesk', 'Other', 'Original Owner LotusWorks', '2026-06-20', ''],
+  ['BIM-1001', 'New legacy Pending issue', 'Pending', 'Clearance', '2026-07-24', '2026-07-31', '2026-07-20', 'Trade B', 'Electrical', 'Field', 'Peter Autodesk', 'Other', 'Jamie Doe - LotusWorks', '2026-07-08', ''],
+  ['bim-1001', 'Duplicate export row', 'Pending', 'Clearance', '2026-07-24', '2026-07-31', '2026-07-20', 'Trade B', 'Electrical', 'Field', 'LotusWorks', 'Other', 'LotusWorks', '2026-07-08', ''],
+  ['BIM-1002', 'New legacy closed issue', 'Closed', 'Quality', '2026-07-24', '2026-07-31', '2026-07-20', 'Trade B', 'Mechanical', 'Field', 'Peter Autodesk', 'Other', 'Sam Leach LotusWorks', '2026-07-09', '2026-07-16'],
+  ['BIM-1003', 'New fallback issue', 'Open', 'Coordination', '2026-07-10', '', '2026-07-24', 'Trade D', 'BIM', 'Field', 'LotusWorks', 'Other', '', '', ''],
+  ['BIM-102', 'Other legacy owner issue', 'Open', 'Quality', '2026-07-09', '', '', 'Trade C', 'Mechanical', 'Field', 'LotusWorks', 'Other', 'Outside Contractor', '2026-07-09', ''],
+  ['', 'Missing ID', 'Open', 'Quality', '2026-07-09', '', '', '', 'Mechanical', 'Field', 'LotusWorks', 'Other', '', '', ''],
 ])
 const currentFile = new File([currentBytes], 'BIM_Issues_Log.xlsx')
 const accFile = new File([accBytes], 'ACC_Issues_Export.xlsx')
@@ -50,26 +53,29 @@ const acc = await prepareIssueWorkbook(accFile, 'acc')
 const analysis = reconcileIssueRows(current, acc)
 
 if (analysis.trackedExistingIds !== 2) throw new Error('The current BIM log did not establish the tracked ID set.')
-if (analysis.lotusWorksRows !== 2) throw new Error('Existing and new LotusWorks issue selection returned the wrong row count.')
-if (analysis.updatedIssues.length !== 1 || analysis.updatedIssues[0].id !== 'BIM-100') {
-  throw new Error('The transferred existing issue was not selected for update.')
+if (analysis.lotusWorksRows !== 5) throw new Error('Existing and new LotusWorks issue selection returned the wrong row count.')
+if (analysis.updatedIssues.map((issue) => issue.id).join(',') !== 'BIM-100,BIM-950') {
+  throw new Error('The tracked existing issues were not selected for update.')
 }
 if (analysis.skippedDuplicateIds !== 1) throw new Error('Duplicate ACC IDs were not skipped.')
 if (analysis.skippedMissingIds !== 1) throw new Error('Rows without IDs were not skipped.')
 if (analysis.excludedOtherOwners !== 1) throw new Error('Non-LotusWorks creators were not excluded.')
-if (analysis.newIssues.length !== 1 || analysis.newIssues[0].id !== 'BIM-1001') {
-  throw new Error('The expected new LotusWorks issue was not selected.')
+if (analysis.newIssues.map((issue) => issue.id).join(',') !== 'BIM-1001,BIM-1002,BIM-1003') {
+  throw new Error('Legacy and fallback LotusWorks issues were not selected correctly.')
 }
 
 const output = buildUpdatedIssueWorkbook(current, analysis)
 const updated = XLSX.read(output.bytes, { type: 'array', cellDates: true, cellStyles: true })
 const rows = XLSX.utils.sheet_to_json(updated.Sheets.Issues, { defval: '', raw: false })
-if (rows.length !== 3) throw new Error('The updated workbook should contain one appended row.')
-if (rows.map((row) => row.ID).join(',') !== 'BIM-1001,BIM-950,BIM-100') {
+const rawRows = XLSX.utils.sheet_to_json(updated.Sheets.Issues, { defval: '', raw: true })
+if (rows.length !== 5) throw new Error('The updated workbook should contain three appended rows.')
+if (rows.map((row) => row.ID).join(',') !== 'BIM-1003,BIM-1002,BIM-1001,BIM-950,BIM-100') {
   throw new Error('Issue rows are not sorted by descending numeric ID.')
 }
-const appended = rows[0]
-const updatedExisting = rows[2]
+const rowById = new Map(rows.map((row) => [row.ID, row]))
+const rawRowById = new Map(rawRows.map((row) => [row.ID, row]))
+const appended = rowById.get('BIM-1001')
+const updatedExisting = rowById.get('BIM-100')
 if (updatedExisting.Status !== 'Closed' || updatedExisting.Title !== 'Transferred existing issue') {
   throw new Error('The existing issue was not updated from the ACC export.')
 }
@@ -82,19 +88,40 @@ if (appended.ID !== 'BIM-1001' || appended.Status !== 'Pending' || appended.Cont
 if (updatedExisting.Subtype !== 'Access' || appended.Subtype !== 'Clearance') {
   throw new Error('ACC Type was not mapped into the BIM Subtype column.')
 }
-for (const address of ['E2', 'G2', 'E3', 'G3', 'E4', 'F4', 'G4']) {
+for (let row = 2; row <= 6; row += 1) {
+  for (const column of ['E', 'G']) {
+    const address = column + row
+    const cell = updated.Sheets.Issues[address]
+    if (!cell || cell.z !== 'm/d/yy') throw new Error(address + ' is not formatted as an Excel short date.')
+  }
+}
+for (const address of ['F3', 'F4', 'F5', 'F6']) {
   const cell = updated.Sheets.Issues[address]
   if (!cell || cell.z !== 'm/d/yy') throw new Error(address + ' is not formatted as an Excel short date.')
 }
-const preservedCreatedOn = updated.Sheets.Issues.E4?.v
-if (!(preservedCreatedOn instanceof Date) || preservedCreatedOn.toISOString().slice(0, 10) !== '2026-06-01') {
+const expectDate = (id, field, expected) => {
+  const actual = rawRowById.get(id)?.[field]
+  if (!(actual instanceof Date) || actual.toISOString().slice(0, 10) !== expected) {
+    throw new Error(id + ' did not use the expected ' + field + ' date.')
+  }
+}
+expectDate('BIM-100', 'Created on', '2026-06-01')
+expectDate('BIM-100', 'Updated on', '2026-06-18')
+expectDate('BIM-950', 'Created on', '2026-06-20')
+expectDate('BIM-950', 'Updated on', '2026-07-31')
+expectDate('BIM-1001', 'Created on', '2026-07-08')
+expectDate('BIM-1002', 'Created on', '2026-07-09')
+expectDate('BIM-1002', 'Updated on', '2026-07-16')
+expectDate('BIM-1003', 'Created on', '2026-07-10')
+const preservedCreatedOn = rawRowById.get('BIM-100')?.['Created on']
+if (!(preservedCreatedOn instanceof Date)) {
   throw new Error('ACC transfer dates must not replace Created on for existing BIM IDs.')
 }
 if (toIsoWorkWeek(preservedCreatedOn).label !== "WW23'2026") {
   throw new Error('The preserved historical date no longer resolves to its original work week.')
 }
-const preservedUpdatedOn = updated.Sheets.Issues.F4?.v
-if (!(preservedUpdatedOn instanceof Date) || preservedUpdatedOn.toISOString().slice(0, 10) !== '2026-06-18') {
+const preservedUpdatedOn = rawRowById.get('BIM-100')?.['Updated on']
+if (!(preservedUpdatedOn instanceof Date)) {
   throw new Error('ACC transfer dates must not replace Updated on for existing BIM IDs.')
 }
 if (toIsoWorkWeek(preservedUpdatedOn).label !== "WW25'2026") {
