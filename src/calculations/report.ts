@@ -100,6 +100,11 @@ function value(row: Record<string, unknown>, keys: string[]): string {
   return ''
 }
 
+function hasColumn(row: Record<string, unknown>, keys: string[]): boolean {
+  const headers = new Set(Object.keys(row).map((key) => key.toLowerCase().replace(/[^a-z0-9]/g, '')))
+  return keys.some((key) => headers.has(key.toLowerCase().replace(/[^a-z0-9]/g, '')))
+}
+
 function normalizeStatus(status: string): IssueStatus {
   const lower = status.trim().toLowerCase()
   if (lower === 'void') return 'void'
@@ -121,7 +126,11 @@ function shouldIncludeIssue(row: Record<string, unknown>): boolean {
     || legacyIssueValue(row, 'createdOn').trim()
     || legacyIssueValue(row, 'closedOn').trim(),
   )
-  if (!hasLegacyData) return true
+  if (!hasLegacyData) {
+    const standardCreatorAliases = ['Created By', 'Issue Owner']
+    if (!hasColumn(row, standardCreatorAliases)) return true
+    return value(row, standardCreatorAliases).toLowerCase().includes('lotusworks')
+  }
   return legacyCreatedBy.toLowerCase().includes('lotusworks')
 }
 
@@ -133,11 +142,12 @@ function normalizeIssue(row: Record<string, unknown>): IssueRecord {
   const legacyClosedOn = legacyIssueValue(row, 'closedOn').trim()
   const createdOn = parseDate(legacyCreatedOn || value(row, ['Created On', 'Created', 'Date Created']))
   const updatedOn = parseDate(legacyClosedOn || value(row, ['Updated On', 'Updated', 'Closed On', 'Date Closed']))
+  const accType = value(row, ['Type']).trim()
   return {
     id: value(row, ['ID', 'Issue ID', 'BIM ID']) || String(row.__rowNumber ?? row.__rowId ?? ''),
     status,
     statusKind,
-    subtype: value(row, ['Subtype', 'Sub Type', 'Issue Subtype']) || 'Uncategorized',
+    subtype: accType || value(row, ['Subtype', 'Sub Type', 'Issue Subtype']) || 'Uncategorized',
     title: value(row, ['Title', 'Issue', 'Description']) || 'Untitled issue',
     contractor: value(row, ['Contractor', 'Responsible Contractor']) || 'Unassigned',
     discipline: value(row, ['Discipline', 'Trade']) || 'Unassigned',

@@ -57,12 +57,13 @@ const strictDetailBundle = {
       name: 'BIM Issues Log',
       rows: [
         { ID: '1018', Status: 'Pending', 'Created On': '2026-07-24', 'Updated On': '2026-07-31', 'BIM360_Created By': 'LotusWorks', 'BIM360_Created On': '2026-07-24', 'BIM360_Closed On': '' },
-        { ID: '1019', Status: 'Pending', 'Created On': '2026-07-24', 'Updated On': '2026-07-31', 'BIM360_Created By': 'LotusWorks', 'BIM360_Created On': '2026-07-29', 'BIM360_Closed On': '' },
+        { ID: '1019', Status: 'Pending', Type: 'Clearance', Subtype: 'Wrong legacy subtype', 'Created On': '2026-07-24', 'Updated On': '2026-07-31', 'BIM360_Created By': 'LotusWorks', 'BIM360_Created On': '2026-07-29', 'BIM360_Closed On': '' },
         { ID: '1020', Status: 'Closed', 'Created On': '2026-07-24', 'Updated On': '2026-07-24', 'BIM360_Created By': 'LotusWorks', 'BIM360_Created On': '2026-07-01', 'BIM360_Closed On': '2026-07-31' },
         { ID: '1021', Status: 'Closed', 'Created On': '2026-07-24', 'Updated On': '2026-07-24', 'BIM360_Created By': 'LotusWorks', 'BIM360_Created On': '2026-07-29', 'BIM360_Closed On': '2026-07-31' },
         { ID: '1022', Status: 'Closed', 'Created On': '2026-07-24', 'Updated On': '2026-08-04', 'BIM360_Created By': 'LotusWorks', 'BIM360_Created On': '2026-07-01', 'BIM360_Closed On': '' },
         { ID: '1023', Status: 'Pending', 'Created On': '2026-07-30', 'Updated On': '2026-07-31', 'Created By': 'LotusWorks', 'BIM360_Created By': '', 'BIM360_Created On': '', 'BIM360_Closed On': '' },
         { ID: '2000', Status: 'Open', 'Created On': '2026-07-29', 'Updated On': '2026-07-31', 'Created By': 'LotusWorks', 'BIM360_Created By': 'Outside Contractor', 'BIM360_Created On': '2026-07-29', 'BIM360_Closed On': '' },
+        { ID: '2001', Status: 'Open', 'Created On': '2026-07-30', 'Updated On': '2026-07-31', 'Created By': 'Outside Contractor', 'BIM360_Created By': '', 'BIM360_Created On': '', 'BIM360_Closed On': '' },
         { ID: '999', Status: 'Open', 'Created On': '2026-07-24', 'Updated On': '2026-07-31', 'BIM360_Created By': 'LotusWorks', 'BIM360_Created On': '2026-04-24', 'BIM360_Closed On': '' },
       ],
     },
@@ -95,8 +96,11 @@ strictDetailReport.issueTable.forEach((row) => {
 if (strictDetailReport.issueTable.find((row) => row.id === '1019')?.status !== 'Open') {
   throw new Error('A reporting-week Pending issue must display as Open.')
 }
-if (strictDetailReport.issueTable.some((row) => row.id === '2000')) {
-  throw new Error('Legacy ownership did not take priority over the standard Created By field.')
+if (strictDetailReport.issueTable.find((row) => row.id === '1019')?.subtype !== 'Clearance') {
+  throw new Error('ACC Type did not take priority over the legacy Subtype field.')
+}
+if (strictDetailReport.issueTable.some((row) => row.id === '2000' || row.id === '2001')) {
+  throw new Error('Legacy and fallback ACC ownership filters did not exclude outside issues.')
 }
 const strictMetric = (id) => strictDetailReport.kpis.find((item) => item.id === id)?.rawValue
 if (strictMetric('total-opened') !== 7 || strictMetric('total-closed') !== 2 || strictMetric('remaining-open') !== 5) {

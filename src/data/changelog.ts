@@ -7,6 +7,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.0.28',
+    date: '2026-08-11T11:32:42Z',
+    type: 'fix',
+    notes: [
+      'ACC Type is now the primary source for BIM issue Subtype, with older Subtype headers retained as a fallback',
+      'ACC rows with blank BIM360 legacy metadata now use Created By or Issue Owner for LotusWorks ownership while older curated logs remain compatible',
+      'Excel serial dates and numeric date strings from General-formatted XLSX or CSV exports now resolve to the correct dates and work weeks',
+      'Added a comprehensive ACC metadata matrix covering ownership, status aliases, legacy dates, Type priority, metrics, and BIM Issues Detail groups',
+    ],
+  },
+  {
     version: '1.0.27',
     date: '2026-08-10T15:05:41Z',
     type: 'fix',

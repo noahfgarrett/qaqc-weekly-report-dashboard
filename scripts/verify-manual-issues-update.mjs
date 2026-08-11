@@ -29,6 +29,10 @@ const workbookBytes = (rows) => {
   XLSX.utils.book_append_sheet(workbook, worksheet, 'Issues')
   return XLSX.write(workbook, { type: 'array', bookType: 'xlsx', cellDates: true })
 }
+const excelSerial = (isoDate) => {
+  const [year, month, day] = isoDate.split('-').map(Number)
+  return (Date.UTC(year, month - 1, day) - Date.UTC(1899, 11, 30)) / 86400000
+}
 const currentBytes = workbookBytes([
   issueHeaders,
   ['BIM-100', 'Existing issue', 'Open', 'Coordination', '2026-06-01', '2026-06-18', '2026-06-10', 'Old Trade', 'BIM'],
@@ -38,10 +42,10 @@ const accHeaders = issueHeaders.map((header) => header === 'Subtype' ? 'Type' : 
 const accBytes = workbookBytes([
   [...accHeaders, 'Category', 'Created By', 'Created By (Company)', 'BIM360_Created By', 'BIM360_Created On', 'BIM360_Closed On'],
   ['BIM-100', 'Transferred existing issue', 'Closed', 'Access', '2026-07-24', '2026-07-24', '2026-07-05', '', 'BIM', 'Coordination', 'Peter Autodesk', 'Other', '', '', ''],
-  ['BIM-950', 'Legacy existing issue', 'Closed', 'Quality', '2026-07-24', '2026-07-31', '2026-07-01', 'Trade C', 'Mechanical', 'Field', 'Peter Autodesk', 'Other', 'Original Owner LotusWorks', '2026-06-20', ''],
+  ['BIM-950', 'Legacy existing issue', 'Closed', 'Quality', '2026-07-24', excelSerial('2026-07-31'), '2026-07-01', 'Trade C', 'Mechanical', 'Field', 'Peter Autodesk', 'Other', 'Original Owner LotusWorks', excelSerial('2026-06-20'), ''],
   ['BIM-1001', 'New legacy Pending issue', 'Pending', 'Clearance', '2026-07-24', '2026-07-31', '2026-07-20', 'Trade B', 'Electrical', 'Field', 'Peter Autodesk', 'Other', 'Jamie Doe - LotusWorks', '2026-07-08', ''],
   ['bim-1001', 'Duplicate export row', 'Pending', 'Clearance', '2026-07-24', '2026-07-31', '2026-07-20', 'Trade B', 'Electrical', 'Field', 'LotusWorks', 'Other', 'LotusWorks', '2026-07-08', ''],
-  ['BIM-1002', 'New legacy closed issue', 'Closed', 'Quality', '2026-07-24', '2026-07-31', '2026-07-20', 'Trade B', 'Mechanical', 'Field', 'Peter Autodesk', 'Other', 'Sam Leach LotusWorks', '2026-07-09', '2026-07-16'],
+  ['BIM-1002', 'New legacy closed issue', 'Closed', 'Quality', '2026-07-24', '2026-07-31', '2026-07-20', 'Trade B', 'Mechanical', 'Field', 'Peter Autodesk', 'Other', 'Sam Leach LotusWorks', excelSerial('2026-07-09'), excelSerial('2026-07-16')],
   ['BIM-1003', 'New fallback issue', 'Open', 'Coordination', '2026-07-10', '', '2026-07-24', 'Trade D', 'BIM', 'Field', 'LotusWorks', 'Other', '', '', ''],
   ['BIM-102', 'Other legacy owner issue', 'Open', 'Quality', '2026-07-09', '', '', 'Trade C', 'Mechanical', 'Field', 'LotusWorks', 'Other', 'Outside Contractor', '2026-07-09', ''],
   ['', 'Missing ID', 'Open', 'Quality', '2026-07-09', '', '', '', 'Mechanical', 'Field', 'LotusWorks', 'Other', '', '', ''],

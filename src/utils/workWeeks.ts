@@ -9,13 +9,31 @@ function cleanDate(date: Date): Date {
 export function parseDate(value: unknown): Date | null {
   if (value instanceof Date && !Number.isNaN(value.getTime())) return cleanDate(value)
   if (typeof value === 'number') {
-    const numeric = new Date(value)
+    const numeric = value > 0 && value < 1_000_000
+      ? new Date(Date.UTC(1899, 11, 30) + Math.floor(value) * MS_PER_DAY)
+      : new Date(value)
+    if (value > 0 && value < 1_000_000) {
+      return new Date(
+        numeric.getUTCFullYear(),
+        numeric.getUTCMonth(),
+        numeric.getUTCDate(),
+        12,
+        0,
+        0,
+        0,
+      )
+    }
     return Number.isNaN(numeric.getTime()) ? null : cleanDate(numeric)
   }
   if (typeof value !== 'string') return null
 
   const trimmed = value.trim()
   if (!trimmed) return null
+
+  if (/^\d+(?:\.\d+)?$/.test(trimmed)) {
+    const numericValue = Number(trimmed)
+    if (numericValue > 0 && numericValue < 1_000_000) return parseDate(numericValue)
+  }
 
   const isoDateOnly = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/)
   if (isoDateOnly) {
