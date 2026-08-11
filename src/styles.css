@@ -851,7 +851,7 @@ select:disabled {
 
 .manual-issues-table {
   border-collapse: collapse;
-  min-width: 1280px;
+  min-width: 720px;
   table-layout: fixed;
   width: 100%;
 }
@@ -880,26 +880,17 @@ select:disabled {
 
 .manual-issues-table th:nth-child(1),
 .manual-issues-table td:nth-child(1) {
-  width: 92px;
+  width: 130px;
 }
 
 .manual-issues-table th:nth-child(2),
 .manual-issues-table td:nth-child(2) {
-  width: 110px;
+  width: 190px;
 }
 
 .manual-issues-table th:nth-child(3),
 .manual-issues-table td:nth-child(3) {
-  width: 270px;
-}
-
-.manual-issues-table th:nth-child(6),
-.manual-issues-table td:nth-child(6),
-.manual-issues-table th:nth-child(7),
-.manual-issues-table td:nth-child(7),
-.manual-issues-table th:nth-child(8),
-.manual-issues-table td:nth-child(8) {
-  width: 120px;
+  width: 210px;
 }
 
 .manual-issues-table tbody tr:hover {

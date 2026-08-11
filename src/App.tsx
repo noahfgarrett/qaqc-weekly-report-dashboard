@@ -1384,12 +1384,7 @@ function ManualIssuesUpdate() {
     [current, acc],
   )
   const issueChanges = useMemo(
-    () => analysis
-      ? [
-          ...analysis.updatedIssues.map((issue) => ({ issue, action: 'Updated' as const })),
-          ...analysis.newIssues.map((issue) => ({ issue, action: 'Added' as const })),
-        ]
-      : [],
+    () => analysis?.changes ?? [],
     [analysis],
   )
 
@@ -1413,14 +1408,14 @@ function ManualIssuesUpdate() {
   }
 
   function downloadUpdatedLog(): void {
-    if (!current || !analysis || issueChanges.length === 0) return
+    if (!acc || !analysis) return
     setError(null)
     try {
-      const output = buildUpdatedIssueWorkbook(current, analysis)
+      const output = buildUpdatedIssueWorkbook(acc, analysis)
       downloadUpdatedIssueWorkbook(output)
       setDownloadedFile(output.fileName)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'The updated BIM Issues Log could not be created.')
+      setError(err instanceof Error ? err.message : 'The enriched ACC export could not be created.')
     }
   }
 
@@ -1451,7 +1446,7 @@ function ManualIssuesUpdate() {
 
       <div className="manual-update-heading">
         <div>
-          <span>ISSUE RECONCILIATION</span>
+          <span>ACC METADATA ENRICHMENT</span>
           <h2>Manual Issues Update</h2>
         </div>
         <div className="secure-mark">
@@ -1471,7 +1466,7 @@ function ManualIssuesUpdate() {
       <div className="manual-file-grid">
         <ManualIssueFileSlot
           kind="current"
-          title="Current BIM Issues Log"
+          title="Current Reference Log"
           workbook={current}
           loading={loading === 'current'}
           onChoose={() => currentInputRef.current?.click()}
@@ -1483,7 +1478,7 @@ function ManualIssuesUpdate() {
         />
         <ManualIssueFileSlot
           kind="acc"
-          title="ACC Issues Export"
+          title="ACC Export to Enrich"
           workbook={acc}
           loading={loading === 'acc'}
           onChoose={() => accInputRef.current?.click()}
@@ -1499,49 +1494,49 @@ function ManualIssuesUpdate() {
         <>
           <div className="manual-summary-grid">
             <article>
-              <span>Current log</span>
-              <strong>{analysis.currentRows.toLocaleString()}</strong>
-              <small>existing rows</small>
+              <span>ACC export</span>
+              <strong>{analysis.accRows.toLocaleString()}</strong>
+              <small>rows preserved</small>
             </article>
             <article>
-              <span>Ready to update</span>
-              <strong>{analysis.updatedIssues.length.toLocaleString()}</strong>
-              <small>existing IDs changed</small>
+              <span>Matched IDs</span>
+              <strong>{analysis.matchedRows.toLocaleString()}</strong>
+              <small>reference rows found</small>
             </article>
             <article className="new-issues">
-              <span>Ready to add</span>
-              <strong>{analysis.newIssues.length.toLocaleString()}</strong>
-              <small>new LotusWorks IDs</small>
+              <span>Contractor fills</span>
+              <strong>{analysis.filledContractors.toLocaleString()}</strong>
+              <small>blank ACC cells</small>
             </article>
             <article>
-              <span>Already current</span>
-              <strong>{analysis.unchangedExistingIds.toLocaleString()}</strong>
-              <small>matching IDs unchanged</small>
+              <span>Discipline fills</span>
+              <strong>{analysis.filledDisciplines.toLocaleString()}</strong>
+              <small>blank ACC cells</small>
             </article>
           </div>
 
           <div className="manual-results-panel">
             <div className="manual-results-header">
               <div>
-                <h3>LotusWorks Issue Changes</h3>
+                <h3>ACC Enrichment Preview</h3>
                 <p>
-                  {analysis.excludedOtherOwners.toLocaleString()} other-owner rows excluded ·{' '}
-                  {(analysis.skippedDuplicateIds + analysis.skippedMissingIds).toLocaleString()} duplicate or missing IDs skipped
+                  {analysis.unmatchedRows.toLocaleString()} ACC IDs not found in the reference ·{' '}
+                  {analysis.missingIdRows.toLocaleString()} rows without IDs left untouched ·{' '}
+                  {analysis.duplicateCurrentIds.toLocaleString()} duplicate reference IDs ignored
                 </p>
               </div>
               <div className="manual-results-actions">
                 <button className="button secondary" type="button" onClick={() => setSummaryOpen(true)}>
                   <Table2 size={16} />
-                  Review Changes
+                  Review Fills
                 </button>
                 <button
                   className="button primary"
                   type="button"
-                  disabled={issueChanges.length === 0}
                   onClick={downloadUpdatedLog}
                 >
                   <Download size={16} />
-                  Download Updated Log
+                  Download Enriched ACC
                 </button>
               </div>
             </div>
@@ -1551,31 +1546,19 @@ function ManualIssuesUpdate() {
                 <table className="manual-issues-table">
                   <thead>
                     <tr>
-                      <th>Change</th>
                       <th>ID</th>
-                      <th>Title</th>
-                      <th>Status</th>
-                      <th>Subtype</th>
-                      <th>Created on</th>
-                      <th>Updated on</th>
-                      <th>Due date</th>
+                      <th>Filled fields</th>
                       <th>Contractor</th>
                       <th>Discipline</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {issueChanges.map(({ issue, action }) => (
-                      <tr key={`${action}-${issue.id}-${issue.sourceRow}`}>
-                        <td><span className={cx('manual-change-type', action.toLowerCase())}>{action}</span></td>
-                        <td><strong>{issue.id}</strong></td>
-                        <td>{issue.title || '—'}</td>
-                        <td><span className="manual-status">{issue.status || 'Open'}</span></td>
-                        <td>{issue.subtype || '—'}</td>
-                        <td>{issue.createdOn || '—'}</td>
-                        <td>{issue.updatedOn || '—'}</td>
-                        <td>{issue.dueDate || '—'}</td>
-                        <td>{issue.contractor || '—'}</td>
-                        <td>{issue.discipline || '—'}</td>
+                    {issueChanges.map((change) => (
+                      <tr key={`${change.id}-${change.targetRow}`}>
+                        <td><strong>{change.id}</strong></td>
+                        <td>{change.filledFields.map((field) => field === 'contractor' ? 'Contractor' : 'Discipline').join(' + ')}</td>
+                        <td>{change.contractor || '—'}</td>
+                        <td>{change.discipline || '—'}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -1584,7 +1567,7 @@ function ManualIssuesUpdate() {
             ) : (
               <div className="manual-empty-result">
                 <CheckCircle2 size={24} />
-                <strong>The BIM Issues Log is already current.</strong>
+                <strong>Every matching ACC row already has Contractor and Discipline.</strong>
               </div>
             )}
 
@@ -1604,7 +1587,7 @@ function ManualIssuesUpdate() {
         </div>
       )}
 
-      <Modal open={summaryOpen && Boolean(analysis)} title="Update Summary" onClose={() => setSummaryOpen(false)} wide>
+      <Modal open={summaryOpen && Boolean(analysis)} title="Enrichment Summary" onClose={() => setSummaryOpen(false)} wide>
         {analysis && (
           <div className="manual-summary-modal">
             <div className={cx('manual-summary-outcome', issueChanges.length === 0 && 'current')}>
@@ -1614,32 +1597,30 @@ function ManualIssuesUpdate() {
               <span>
                 <strong>
                   {issueChanges.length === 0
-                    ? 'The BIM Issues Log is already current'
-                    : `${issueChanges.length.toLocaleString()} ${issueChanges.length === 1 ? 'change' : 'changes'} ready`}
+                    ? 'The ACC export is already complete'
+                    : `${issueChanges.length.toLocaleString()} ${issueChanges.length === 1 ? 'row' : 'rows'} ready to enrich`}
                 </strong>
                 <small>
-                  {analysis.updatedIssues.length.toLocaleString()} existing updated ·{' '}
-                  {analysis.newIssues.length.toLocaleString()} new LotusWorks {analysis.newIssues.length === 1 ? 'issue' : 'issues'} added
+                  {analysis.filledContractors.toLocaleString()} Contractor cells ·{' '}
+                  {analysis.filledDisciplines.toLocaleString()} Discipline cells
                 </small>
               </span>
             </div>
 
             <div className="manual-modal-stats">
-              <span><strong>{analysis.updatedIssues.length.toLocaleString()}</strong> existing IDs updated</span>
-              <span><strong>{analysis.newIssues.length.toLocaleString()}</strong> new IDs added</span>
-              <span><strong>{analysis.unchangedExistingIds.toLocaleString()}</strong> already current</span>
-              <span><strong>{analysis.excludedOtherOwners.toLocaleString()}</strong> other owners excluded</span>
+              <span><strong>{analysis.matchedRows.toLocaleString()}</strong> matching ACC rows</span>
+              <span><strong>{issueChanges.length.toLocaleString()}</strong> rows receiving values</span>
+              <span><strong>{analysis.unchangedMatchedRows.toLocaleString()}</strong> matched rows unchanged</span>
+              <span><strong>{analysis.unmatchedRows.toLocaleString()}</strong> unmatched ACC rows preserved</span>
             </div>
 
             {issueChanges.length > 0 && (
               <div className="manual-modal-list">
-                {issueChanges.slice(0, 8).map(({ issue, action }) => (
-                  <div key={`summary-${action}-${issue.id}-${issue.sourceRow}`}>
-                    <strong>{issue.id}</strong>
-                    <span>{issue.title || 'Untitled issue'}</span>
-                    <small title={action === 'Updated' ? issue.changedFields.join(', ') : 'New issue'}>
-                      {action === 'Updated' ? issue.changedFields.join(', ') : 'Added'}
-                    </small>
+                {issueChanges.slice(0, 8).map((change) => (
+                  <div key={`summary-${change.id}-${change.targetRow}`}>
+                    <strong>{change.id}</strong>
+                    <span>{change.contractor || 'No Contractor'} · {change.discipline || 'No Discipline'}</span>
+                    <small>{change.filledFields.map((field) => field === 'contractor' ? 'Contractor' : 'Discipline').join(' + ')}</small>
                   </div>
                 ))}
                 {issueChanges.length > 8 && (
@@ -1656,11 +1637,10 @@ function ManualIssuesUpdate() {
               <button
                 className="button primary"
                 type="button"
-                disabled={issueChanges.length === 0}
                 onClick={downloadUpdatedLog}
               >
                 <Download size={16} />
-                Download Updated Log
+                Download Enriched ACC
               </button>
             </div>
           </div>

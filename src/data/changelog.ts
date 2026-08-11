@@ -7,6 +7,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.0.29',
+    date: '2026-08-11T13:05:31Z',
+    type: 'feature',
+    notes: [
+      'Manual Issues Update is now a focused ACC enrichment workflow that matches IDs against a current reference log',
+      'Only blank ACC Contractor and Discipline cells are filled from matching reference IDs; populated ACC values are never overwritten',
+      'The download is a new ACC workbook copy with every row, column, worksheet, metadata value, and original row order preserved',
+      'The enrichment summary now reports matched IDs, Contractor fills, Discipline fills, unmatched rows, and duplicate reference IDs',
+    ],
+  },
+  {
     version: '1.0.28',
     date: '2026-08-11T11:32:42Z',
     type: 'fix',

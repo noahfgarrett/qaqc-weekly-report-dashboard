@@ -17,124 +17,96 @@ import {
   prepareIssueWorkbook,
   reconcileIssueRows,
 } from ${JSON.stringify(resolve(root, 'src/services/manualIssuesUpdate.ts'))}
-import { toIsoWorkWeek } from ${JSON.stringify(resolve(root, 'src/utils/workWeeks.ts'))}
 
-const issueHeaders = [
-  'ID', 'Title', 'Status', 'Subtype', 'Created on', 'Updated on',
-  'Due date', 'Contractor', 'Discipline',
-]
-const workbookBytes = (rows) => {
+const workbookBytes = (rows, includeNotes = false) => {
   const workbook = XLSX.utils.book_new()
   const worksheet = XLSX.utils.aoa_to_sheet(rows)
+  worksheet['!autofilter'] = { ref: 'A1:F' + rows.length }
   XLSX.utils.book_append_sheet(workbook, worksheet, 'Issues')
-  return XLSX.write(workbook, { type: 'array', bookType: 'xlsx', cellDates: true })
+  if (includeNotes) {
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([['Keep this sheet'], ['Untouched']]), 'Notes')
+  }
+  return XLSX.write(workbook, { type: 'array', bookType: 'xlsx', cellStyles: true })
 }
-const excelSerial = (isoDate) => {
-  const [year, month, day] = isoDate.split('-').map(Number)
-  return (Date.UTC(year, month - 1, day) - Date.UTC(1899, 11, 30)) / 86400000
-}
+
 const currentBytes = workbookBytes([
-  issueHeaders,
-  ['BIM-100', 'Existing issue', 'Open', 'Coordination', '2026-06-01', '2026-06-18', '2026-06-10', 'Old Trade', 'BIM'],
-  ['BIM-950', 'Higher existing issue', 'Open', 'Quality', '2026-06-20', '', '2026-07-01', 'Trade C', 'Mechanical'],
+  ['ID', 'Contractor', 'Discipline', 'Reference Notes'],
+  ['BIM-100', 'Old Trade', 'BIM', 'fill both'],
+  ['BIM-101', 'Trade A', 'Electrical', 'fill discipline only'],
+  ['BIM-102', '', 'Mechanical', 'nothing needed'],
+  ['BIM-103', 'Trade C', '', 'fill contractor only'],
+  ['BIM-104', 'Trade D', 'Piping', 'first duplicate wins'],
+  ['BIM-104', 'Wrong Duplicate', 'Wrong Duplicate', 'ignored duplicate'],
 ])
-const accHeaders = issueHeaders.map((header) => header === 'Subtype' ? 'Type' : header)
 const accBytes = workbookBytes([
-  [...accHeaders, 'Category', 'Created By', 'Created By (Company)', 'BIM360_Created By', 'BIM360_Created On', 'BIM360_Closed On'],
-  ['BIM-100', 'Transferred existing issue', 'Closed', 'Access', '2026-07-24', '2026-07-24', '2026-07-05', '', 'BIM', 'Coordination', 'Peter Autodesk', 'Other', '', '', ''],
-  ['BIM-950', 'Legacy existing issue', 'Closed', 'Quality', '2026-07-24', excelSerial('2026-07-31'), '2026-07-01', 'Trade C', 'Mechanical', 'Field', 'Peter Autodesk', 'Other', 'Original Owner LotusWorks', excelSerial('2026-06-20'), ''],
-  ['BIM-1001', 'New legacy Pending issue', 'Pending', 'Clearance', '2026-07-24', '2026-07-31', '2026-07-20', 'Trade B', 'Electrical', 'Field', 'Peter Autodesk', 'Other', 'Jamie Doe - LotusWorks', '2026-07-08', ''],
-  ['bim-1001', 'Duplicate export row', 'Pending', 'Clearance', '2026-07-24', '2026-07-31', '2026-07-20', 'Trade B', 'Electrical', 'Field', 'LotusWorks', 'Other', 'LotusWorks', '2026-07-08', ''],
-  ['BIM-1002', 'New legacy closed issue', 'Closed', 'Quality', '2026-07-24', '2026-07-31', '2026-07-20', 'Trade B', 'Mechanical', 'Field', 'Peter Autodesk', 'Other', 'Sam Leach LotusWorks', excelSerial('2026-07-09'), excelSerial('2026-07-16')],
-  ['BIM-1003', 'New fallback issue', 'Open', 'Coordination', '2026-07-10', '', '2026-07-24', 'Trade D', 'BIM', 'Field', 'LotusWorks', 'Other', '', '', ''],
-  ['BIM-102', 'Other legacy owner issue', 'Open', 'Quality', '2026-07-09', '', '', 'Trade C', 'Mechanical', 'Field', 'LotusWorks', 'Other', 'Outside Contractor', '2026-07-09', ''],
-  ['', 'Missing ID', 'Open', 'Quality', '2026-07-09', '', '', '', 'Mechanical', 'Field', 'LotusWorks', 'Other', '', '', ''],
-])
-const currentFile = new File([currentBytes], 'BIM_Issues_Log.xlsx')
+  ['Issue ID', 'Responsible Contractor', 'Trade', 'Title', 'Status', 'ACC Metadata'],
+  ['BIM-100', '', '', 'One hundred', 'Pending', 'keep-100'],
+  ['BIM-101', 'ACC Trade', '', 'One hundred one', 'Open', 'keep-101'],
+  ['BIM-102', '', 'ACC Discipline', 'One hundred two', 'Closed', 'keep-102'],
+  ['BIM-103', '', '', 'One hundred three', 'Open', 'keep-103'],
+  ['BIM-104', '   ', '   ', 'One hundred four', 'Open', 'keep-104'],
+  ['BIM-999', '', '', 'Unmatched issue', 'Open', 'keep-999'],
+  ['', '', '', 'Missing ID row', 'Open', 'keep-missing'],
+], true)
+
+const currentFile = new File([currentBytes], 'Current_BIM_Issues_Log.xlsx')
 const accFile = new File([accBytes], 'ACC_Issues_Export.xlsx')
 const current = await prepareIssueWorkbook(currentFile, 'current')
 const acc = await prepareIssueWorkbook(accFile, 'acc')
 const analysis = reconcileIssueRows(current, acc)
 
-if (analysis.trackedExistingIds !== 2) throw new Error('The current BIM log did not establish the tracked ID set.')
-if (analysis.lotusWorksRows !== 5) throw new Error('Existing and new LotusWorks issue selection returned the wrong row count.')
-if (analysis.updatedIssues.map((issue) => issue.id).join(',') !== 'BIM-100,BIM-950') {
-  throw new Error('The tracked existing issues were not selected for update.')
+if (analysis.currentRows !== 6 || analysis.accRows !== 7) throw new Error('Workbook row counts changed unexpectedly.')
+if (analysis.matchedRows !== 5 || analysis.unmatchedRows !== 1 || analysis.missingIdRows !== 1) {
+  throw new Error('ID matching did not preserve unmatched or missing-ID ACC rows.')
 }
-if (analysis.skippedDuplicateIds !== 1) throw new Error('Duplicate ACC IDs were not skipped.')
-if (analysis.skippedMissingIds !== 1) throw new Error('Rows without IDs were not skipped.')
-if (analysis.excludedOtherOwners !== 1) throw new Error('Non-LotusWorks creators were not excluded.')
-if (analysis.newIssues.map((issue) => issue.id).join(',') !== 'BIM-1001,BIM-1002,BIM-1003') {
-  throw new Error('Legacy and fallback LotusWorks issues were not selected correctly.')
+if (analysis.duplicateCurrentIds !== 1) throw new Error('Duplicate reference IDs were not detected.')
+if (analysis.unchangedMatchedRows !== 1) throw new Error('The already-complete matched row was not left unchanged.')
+if (analysis.filledContractors !== 3 || analysis.filledDisciplines !== 3) {
+  throw new Error('Contractor and Discipline fill counts are incorrect.')
+}
+if (analysis.changes.map((change) => change.id).join(',') !== 'BIM-100,BIM-101,BIM-103,BIM-104') {
+  throw new Error('The wrong ACC rows were selected for enrichment.')
 }
 
-const output = buildUpdatedIssueWorkbook(current, analysis)
-const updated = XLSX.read(output.bytes, { type: 'array', cellDates: true, cellStyles: true })
-const rows = XLSX.utils.sheet_to_json(updated.Sheets.Issues, { defval: '', raw: false })
-const rawRows = XLSX.utils.sheet_to_json(updated.Sheets.Issues, { defval: '', raw: true })
-if (rows.length !== 5) throw new Error('The updated workbook should contain three appended rows.')
-if (rows.map((row) => row.ID).join(',') !== 'BIM-1003,BIM-1002,BIM-1001,BIM-950,BIM-100') {
-  throw new Error('Issue rows are not sorted by descending numeric ID.')
+const output = buildUpdatedIssueWorkbook(acc, analysis)
+const enriched = XLSX.read(output.bytes, { type: 'array', cellStyles: true })
+if (enriched.SheetNames.join(',') !== 'Issues,Notes') throw new Error('The ACC workbook sheet structure was not preserved.')
+if (enriched.Sheets.Notes.A1?.v !== 'Keep this sheet' || enriched.Sheets.Notes.A2?.v !== 'Untouched') {
+  throw new Error('A secondary ACC worksheet was modified.')
 }
-const rowById = new Map(rows.map((row) => [row.ID, row]))
-const rawRowById = new Map(rawRows.map((row) => [row.ID, row]))
-const appended = rowById.get('BIM-1001')
-const updatedExisting = rowById.get('BIM-100')
-if (updatedExisting.Status !== 'Closed' || updatedExisting.Title !== 'Transferred existing issue') {
-  throw new Error('The existing issue was not updated from the ACC export.')
+if (enriched.Sheets.Issues['!autofilter']?.ref !== 'A1:F8') {
+  throw new Error('The ACC worksheet filter range was not preserved.')
 }
-if (updatedExisting.Contractor !== 'Old Trade') {
-  throw new Error('A blank ACC value overwrote an existing BIM log value.')
+
+const rows = XLSX.utils.sheet_to_json(enriched.Sheets.Issues, { defval: '', raw: false })
+if (rows.map((row) => row['Issue ID']).join(',') !== 'BIM-100,BIM-101,BIM-102,BIM-103,BIM-104,BIM-999,') {
+  throw new Error('ACC row order or row membership changed.')
 }
-if (appended.ID !== 'BIM-1001' || appended.Status !== 'Pending' || appended.Contractor !== 'Trade B') {
-  throw new Error('The appended issue fields do not match the ACC export.')
-}
-if (updatedExisting.Subtype !== 'Access' || appended.Subtype !== 'Clearance') {
-  throw new Error('ACC Type was not mapped into the BIM Subtype column.')
-}
-for (let row = 2; row <= 6; row += 1) {
-  for (const column of ['E', 'G']) {
-    const address = column + row
-    const cell = updated.Sheets.Issues[address]
-    if (!cell || cell.z !== 'm/d/yy') throw new Error(address + ' is not formatted as an Excel short date.')
+const byId = new Map(rows.filter((row) => row['Issue ID']).map((row) => [row['Issue ID'], row]))
+const expectFields = (id, contractor, discipline) => {
+  const row = byId.get(id)
+  if (row?.['Responsible Contractor'] !== contractor || row?.Trade !== discipline) {
+    throw new Error(id + ' did not retain the expected Contractor and Discipline.')
   }
 }
-for (const address of ['F3', 'F4', 'F5', 'F6']) {
-  const cell = updated.Sheets.Issues[address]
-  if (!cell || cell.z !== 'm/d/yy') throw new Error(address + ' is not formatted as an Excel short date.')
+expectFields('BIM-100', 'Old Trade', 'BIM')
+expectFields('BIM-101', 'ACC Trade', 'Electrical')
+expectFields('BIM-102', '', 'ACC Discipline')
+expectFields('BIM-103', 'Trade C', '')
+expectFields('BIM-104', 'Trade D', 'Piping')
+expectFields('BIM-999', '', '')
+
+rows.forEach((row) => {
+  const id = row['Issue ID'] || 'missing'
+  const expected = id === 'missing' ? 'keep-missing' : 'keep-' + id.replace('BIM-', '')
+  if (row['ACC Metadata'] !== expected) throw new Error(id + ' lost unrelated ACC metadata.')
+})
+if (!output.fileName.startsWith('ACC_Issues_Export-Enriched-') || !output.fileName.endsWith('.xlsx')) {
+  throw new Error('The enriched workbook filename is not based on the ACC export.')
 }
-const expectDate = (id, field, expected) => {
-  const actual = rawRowById.get(id)?.[field]
-  if (!(actual instanceof Date) || actual.toISOString().slice(0, 10) !== expected) {
-    throw new Error(id + ' did not use the expected ' + field + ' date.')
-  }
+if (acc.rows[0]['Responsible Contractor'] !== '' || acc.rows[0].Trade !== '') {
+  throw new Error('The in-memory ACC source model was mutated.')
 }
-expectDate('BIM-100', 'Created on', '2026-06-01')
-expectDate('BIM-100', 'Updated on', '2026-06-18')
-expectDate('BIM-950', 'Created on', '2026-06-20')
-expectDate('BIM-950', 'Updated on', '2026-07-31')
-expectDate('BIM-1001', 'Created on', '2026-07-08')
-expectDate('BIM-1002', 'Created on', '2026-07-09')
-expectDate('BIM-1002', 'Updated on', '2026-07-16')
-expectDate('BIM-1003', 'Created on', '2026-07-10')
-const preservedCreatedOn = rawRowById.get('BIM-100')?.['Created on']
-if (!(preservedCreatedOn instanceof Date)) {
-  throw new Error('ACC transfer dates must not replace Created on for existing BIM IDs.')
-}
-if (toIsoWorkWeek(preservedCreatedOn).label !== "WW23'2026") {
-  throw new Error('The preserved historical date no longer resolves to its original work week.')
-}
-const preservedUpdatedOn = rawRowById.get('BIM-100')?.['Updated on']
-if (!(preservedUpdatedOn instanceof Date)) {
-  throw new Error('ACC transfer dates must not replace Updated on for existing BIM IDs.')
-}
-if (toIsoWorkWeek(preservedUpdatedOn).label !== "WW25'2026") {
-  throw new Error('The preserved historical closure date no longer resolves to its original work week.')
-}
-if (!output.fileName.includes('BIM_Issues_Log-Updated-')) {
-  throw new Error('The updated workbook filename is not traceable to the source log.')
-}
-if (current.rows.length !== 2) throw new Error('The source workbook model was mutated.')
 `
 
 try {
@@ -153,7 +125,7 @@ try {
     },
   })
   await import(`${pathToFileURL(resolve(outputDirectory, 'manual-issues-check.mjs')).href}?t=${Date.now()}`)
-  console.log('Manual issue update refreshes tracked IDs, adds new LotusWorks IDs, preserves nonblank history, and writes the updated workbook.')
+  console.log('Manual update fills only blank ACC Contractor and Discipline cells while preserving the ACC workbook.')
 } finally {
   await rm(temporaryDirectory, { recursive: true, force: true })
 }
