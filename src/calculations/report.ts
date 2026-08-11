@@ -560,7 +560,16 @@ export function buildReportModel(
     ),
     makeMetric('inspections', 'Inspections', inspectionsWeek, inspectionsPrevious, ClipboardCheck, 'good', compactNumber, inspectionsSeries),
     makeMetric('sors', 'SORs', sorsWeek, sorsPrevious, Wrench, sorsWeek > sorsPrevious ? 'warn' : 'neutral', compactNumber, sorsSeries),
-    makeMetric('closure-rate', 'Closure Rate', closureRate, previousClosureRate, Gauge, 'good', (value) => percent(value, 1), closureRateSeries),
+    makeMetric(
+      'closure-rate',
+      'Closure Rate',
+      closureRate,
+      previousClosureRate,
+      Gauge,
+      closureRate > previousClosureRate ? 'good' : closureRate < previousClosureRate ? 'bad' : 'neutral',
+      (value) => percent(value, 1),
+      closureRateSeries,
+    ),
   ]
 
   const electrical = buildElectrical(electricalRecords, reportWeek)

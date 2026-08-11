@@ -7,6 +7,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.0.30',
+    date: '2026-08-11T13:35:46Z',
+    type: 'fix',
+    notes: [
+      'Closure Rate week-over-week comparisons now use green when the percentage improves and red when it declines',
+      'An unchanged Closure Rate remains neutral across the dashboard and exported Project to Date cards',
+      'Regression coverage verifies improving, declining, and unchanged Closure Rate scenarios',
+    ],
+  },
+  {
     version: '1.0.29',
     date: '2026-08-11T13:05:31Z',
     type: 'feature',

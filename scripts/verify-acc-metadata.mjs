@@ -146,6 +146,40 @@ if (!report.filterOptions.subtypes.includes('Fallback subtype')) {
 if (report.filterOptions.statuses.includes('Void')) {
   throw new Error('Void leaked into the status filter options.')
 }
+
+const closureMetric = (model) => model.kpis.find((item) => item.id === 'closure-rate')
+if (closureMetric(report)?.tone !== 'good') {
+  throw new Error('An improving Closure Rate must use the green good tone.')
+}
+
+const priorWeekIssues = [
+  { ID: '4001', Status: 'Closed', 'Created On': '2026-07-01', 'Updated On': '2026-07-10' },
+  { ID: '4002', Status: 'Closed', 'Created On': '2026-07-02', 'Updated On': '2026-07-11' },
+  { ID: '4003', Status: 'Open', 'Created On': '2026-07-03', 'Updated On': '2026-07-03' },
+  { ID: '4004', Status: 'Open', 'Created On': '2026-07-04', 'Updated On': '2026-07-04' },
+]
+const newOpenIssues = [
+  { ID: '4005', Status: 'Open', 'Created On': '2026-08-04', 'Updated On': '2026-08-04' },
+  { ID: '4006', Status: 'Open', 'Created On': '2026-08-05', 'Updated On': '2026-08-05' },
+  { ID: '4007', Status: 'Open', 'Created On': '2026-08-06', 'Updated On': '2026-08-06' },
+  { ID: '4008', Status: 'Open', 'Created On': '2026-08-07', 'Updated On': '2026-08-07' },
+]
+const reportForIssues = (rows) => buildReportModel({
+  ...bundle,
+  sheets: {
+    ...bundle.sheets,
+    bimIssues: { id: 'closure-tone', name: 'ACC Issues Export', rows },
+  },
+}, mergeFilters({ oac: true }), new Date(2026, 7, 11, 12))
+
+const decliningClosure = closureMetric(reportForIssues([...priorWeekIssues, ...newOpenIssues]))
+if (decliningClosure?.rawValue !== 25 || decliningClosure.tone !== 'bad') {
+  throw new Error('A declining Closure Rate must use the red bad tone.')
+}
+const unchangedClosure = closureMetric(reportForIssues(priorWeekIssues))
+if (unchangedClosure?.rawValue !== 50 || unchangedClosure.tone !== 'neutral') {
+  throw new Error('An unchanged Closure Rate must use the neutral tone.')
+}
 `
 
 try {
@@ -164,7 +198,7 @@ try {
     },
   })
   await import(`${pathToFileURL(resolve(outputDirectory, 'acc-metadata-check.mjs')).href}?t=${Date.now()}`)
-  console.log('ACC ownership, legacy dates, Type metadata, statuses, work weeks, metrics, and detail groups populate correctly.')
+  console.log('ACC metadata, report groups, metrics, and directional Closure Rate tones populate correctly.')
 } finally {
   await rm(temporaryDirectory, { recursive: true, force: true })
 }
