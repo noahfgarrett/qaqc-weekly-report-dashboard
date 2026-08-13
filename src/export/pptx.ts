@@ -32,7 +32,7 @@ const C = {
   obsidian: '1B2530',
 }
 
-function addHeader(slide: pptxgen.Slide, title: string, report: ReportModel, context = `Report Week ${report.reportWeek.label}`): void {
+function addHeader(slide: pptxgen.Slide, title: string, report: ReportModel, context = report.periodLabel): void {
   slide.background = { color: C.white }
   // Slate-blue brand mark, matching the app header
   slide.addShape('roundRect', {
@@ -57,7 +57,11 @@ function addHeader(slide: pptxgen.Slide, title: string, report: ReportModel, con
     margin: 0,
   })
   const pills = [
-    `OAC Through ${report.reportWeek.label}`,
+    report.reportingMode === 'justine'
+      ? `Justine ${report.periodLabel}`
+      : report.reportingMode === 'manual'
+        ? 'Manual Selection'
+        : `OAC Through ${report.periodEndWeek.label}`,
     report.source === 'files' ? 'Imported Files' : 'Preview Layout',
     context,
   ]
@@ -650,8 +654,8 @@ export async function exportReportDeck(report: ReportModel): Promise<void> {
   const pptx = new pptxgen()
   pptx.layout = 'LAYOUT_WIDE'
   pptx.author = 'QA/QC Weekly Report Dashboard'
-  pptx.subject = `Weekly report through ${report.reportWeek.label}`
-  pptx.title = `QA/QC Weekly Report ${report.reportWeek.label}`
+  pptx.subject = `QA/QC report ${report.periodLabel}`
+  pptx.title = `QA/QC Weekly Report ${report.periodLabel}`
   pptx.company = 'Generated Dashboard'
   pptx.theme = {
     headFontFace: 'Aptos Display',
@@ -670,8 +674,8 @@ export async function exportReportDeck(report: ReportModel): Promise<void> {
     .filter((metric): metric is KpiMetric => Boolean(metric))
   const kpiGroupGap = 0.18
   const kpiGroupW = (12.23 - kpiGroupGap) / 2
-  addKpiGroup(slide1, 0.55, kpiY, kpiGroupW, 1.62, 'PROJECT TO DATE', `Through ${report.reportWeek.label}`, projectMetrics, C.surface)
-  addKpiGroup(slide1, 0.55 + kpiGroupW + kpiGroupGap, kpiY, kpiGroupW, 1.62, report.reportWeek.label, '', weekMetrics, C.panel, false)
+  addKpiGroup(slide1, 0.55, kpiY, kpiGroupW, 1.62, 'PROJECT TO DATE', `Through ${report.periodEndWeek.label}`, projectMetrics, C.surface)
+  addKpiGroup(slide1, 0.55 + kpiGroupW + kpiGroupGap, kpiY, kpiGroupW, 1.62, report.periodLabel, '', weekMetrics, C.panel, false)
   addIssueTrend(slide1, report.issueTrend, 0.55, SAFE_TOP + 1.86, 12.23, 1.82)
   addMonthly(slide1, report.monthlyTrend, 0.55, SAFE_TOP + 3.9, 7.85, 1.88)
   addAging(slide1, report.aging, 8.62, SAFE_TOP + 3.9, 4.16, 1.88)
@@ -682,17 +686,18 @@ export async function exportReportDeck(report: ReportModel): Promise<void> {
     const slide = pptx.addSlide()
     addHeader(slide, `BIM Issues Detail${pages.length > 1 ? ` (${pageIndex + 1} of ${pages.length})` : ''}`, report)
     const openedGroup: IssueDetailRow['group'] = report.activeFilters.oac ? 'Opened in Report Week' : 'Open Carryover'
-    const openedLabel = report.activeFilters.oac ? 'Issues Opened During Report Week' : 'Issues Remaining Open'
+    const periodName = report.reportingMode === 'justine' ? 'Reporting Period' : 'Report Week'
+    const openedLabel = report.activeFilters.oac ? `Issues Opened During ${periodName}` : 'Issues Remaining Open'
     addKpiCard(slide, 0.55, SAFE_TOP + 0.82, 2.7, openedLabel, compactNumber(report.issueTable.filter((row) => row.group === openedGroup).length), '', C.teal)
-    addKpiCard(slide, 3.47, SAFE_TOP + 0.82, 2.7, 'Issues Closed During Report Week', compactNumber(report.issueTable.filter((row) => row.group === 'Closed in Report Week').length), '', C.mint)
-    addKpiCard(slide, 6.39, SAFE_TOP + 0.82, 2.7, 'Opened + Closed Within Report Week', compactNumber(report.issueTable.filter((row) => row.group === 'Opened + Closed in Report Week').length), '', C.cyan)
+    addKpiCard(slide, 3.47, SAFE_TOP + 0.82, 2.7, `Issues Closed During ${periodName}`, compactNumber(report.issueTable.filter((row) => row.group === 'Closed in Report Week').length), '', C.mint)
+    addKpiCard(slide, 6.39, SAFE_TOP + 0.82, 2.7, `Opened + Closed Within ${periodName}`, compactNumber(report.issueTable.filter((row) => row.group === 'Opened + Closed in Report Week').length), '', C.cyan)
     addKpiCard(slide, 9.31, SAFE_TOP + 0.82, 2.7, 'Issues Closed During Current Week', compactNumber(report.issueTable.filter((row) => row.group === 'Closed This Week').length), '', C.amber)
     addIssueTable(slide, rows)
     addFooter(slide, report)
   })
 
   const fieldSlide = pptx.addSlide()
-  addHeader(fieldSlide, 'Inspections & Welding Signoffs', report, `Current Week ${report.currentWeek.label}`)
+  addHeader(fieldSlide, 'Inspections & Welding Signoffs', report, report.periodLabel)
   const chips = [
     ['Electrical Finals', compactNumber(report.summary.electricalFinals), deltaLabel(report.summary.deltas.electricalFinals)],
     ['Electrical Issues Found', compactNumber(report.summary.electricalIssuesFound), deltaLabel(report.summary.deltas.electricalIssuesFound)],
@@ -706,7 +711,7 @@ export async function exportReportDeck(report: ReportModel): Promise<void> {
     SAFE_TOP + 0.82,
     2.3,
     percent(report.summary.overallSignoffRate, 1),
-    report.reportWeek.label,
+    report.periodLabel,
     percent(report.summary.reportWeekSignoffRate, 1),
     deltaLabel(report.summary.deltas.reportWeekSignoffRate),
   )
@@ -718,5 +723,5 @@ export async function exportReportDeck(report: ReportModel): Promise<void> {
   const blob = output instanceof Blob
     ? output
     : new Blob([output as BlobPart], { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' })
-  downloadPresentationBlob(blob, `QAQC Weekly Report ${report.reportWeek.label.replace("'", '-')}.pptx`)
+  downloadPresentationBlob(blob, `QAQC Weekly Report ${report.periodLabel.replace(/'/g, '-')}.pptx`)
 }

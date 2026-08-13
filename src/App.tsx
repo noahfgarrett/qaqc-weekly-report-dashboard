@@ -401,7 +401,7 @@ function KpiZone({ report }: { report: ReturnType<typeof buildReportModel> }) {
       <section className="kpi-group primary">
         <div className="kpi-group-head">
           <span>Project to date</span>
-          <em>Through {report.reportWeek.label}</em>
+          <em>Through {report.periodEndWeek.label}</em>
         </div>
         <div className="kpi-group-body">
           {KPI_GROUPS.primary.map((id) => {
@@ -412,7 +412,7 @@ function KpiZone({ report }: { report: ReturnType<typeof buildReportModel> }) {
       </section>
       <section className="kpi-group this-week">
         <div className="kpi-group-head">
-          <span>{report.reportWeek.label}</span>
+          <span>{report.periodLabel}</span>
         </div>
         <div className="kpi-group-body">
           {KPI_GROUPS.week.map((id) => {
@@ -444,7 +444,7 @@ function FilterMenu({
   const menuRef = useRef<HTMLDivElement>(null)
   const active = !disabled && selected.length > 0
   const display = disabled
-    ? 'OAC range'
+    ? 'Report range'
     : selected.length === 0
       ? 'All'
       : selected.length === 1
@@ -1037,10 +1037,19 @@ function IssueTableSlide({
   const visibleRows = rows ?? report.issueTable
   const detailCards: Array<{ group: IssueDetailRow['group']; label: string }> = [
     report.activeFilters.oac
-      ? { group: 'Opened in Report Week', label: 'Issues Opened During Report Week' }
+      ? {
+          group: 'Opened in Report Week',
+          label: report.reportingMode === 'justine' ? 'Issues Opened During Reporting Period' : 'Issues Opened During Report Week',
+        }
       : { group: 'Open Carryover', label: 'Issues Remaining Open' },
-    { group: 'Closed in Report Week', label: 'Issues Closed During Report Week' },
-    { group: 'Opened + Closed in Report Week', label: 'Opened + Closed Within Report Week' },
+    {
+      group: 'Closed in Report Week',
+      label: report.reportingMode === 'justine' ? 'Issues Closed During Reporting Period' : 'Issues Closed During Report Week',
+    },
+    {
+      group: 'Opened + Closed in Report Week',
+      label: report.reportingMode === 'justine' ? 'Opened + Closed Within Reporting Period' : 'Opened + Closed Within Report Week',
+    },
     { group: 'Closed This Week', label: 'Issues Closed During Current Week' },
   ]
   return (
@@ -1124,7 +1133,7 @@ function FieldSlide({ report, exportable }: { report: ReturnType<typeof buildRep
               <strong>{percent(report.summary.overallSignoffRate, 1)}</strong>
             </div>
             <div>
-              <small>{report.reportWeek.label}</small>
+              <small>{report.periodLabel}</small>
               <strong>{percent(report.summary.reportWeekSignoffRate, 1)}</strong>
               <em>{deltaLabel(report.summary.deltas.reportWeekSignoffRate)}</em>
             </div>
@@ -1841,7 +1850,7 @@ export default function App() {
               {workspaceTab === 'manual'
                 ? 'Reconcile LotusWorks issues from ACC'
                 : hasReport
-                  ? `Weekly report through ${report.reportWeek.label}`
+                  ? `Weekly report | ${report.periodLabel}`
                   : 'Import weekly exports to generate a report'}
             </p>
           </div>
@@ -1961,14 +1970,28 @@ export default function App() {
 
       {workspaceTab === 'report' && hasReport && (
         <section className="filter-strip">
-          <button
-            className={cx('oac-toggle', filters.oac && 'on')}
-            type="button"
-            onClick={() => setFilters((prev) => ({ ...prev, oac: !prev.oac }))}
-          >
-            <span>OAC</span>
-            <strong>{filters.oac ? `Through ${report.reportWeek.label}` : 'Manual'}</strong>
-          </button>
+          <div className="report-mode-picker" role="group" aria-label="Reporting mode">
+            {([
+              ['oac', 'OAC'],
+              ['justine', 'Justine'],
+              ['manual', 'Manual'],
+            ] as const).map(([mode, label]) => (
+              <button
+                className={cx('report-mode-option', filters.reportingMode === mode && 'active')}
+                type="button"
+                key={mode}
+                aria-pressed={filters.reportingMode === mode}
+                title={mode === 'oac' ? 'Previous completed work week' : mode === 'justine' ? 'Previous and current work weeks' : 'Choose work weeks'}
+                onClick={() => setFilters((prev) => ({
+                  ...prev,
+                  reportingMode: mode,
+                  oac: mode !== 'manual',
+                }))}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
           <FilterMenu
             label="Work Week"
             icon={<CalendarClock size={14} />}

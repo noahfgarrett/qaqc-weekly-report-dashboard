@@ -296,6 +296,48 @@ select:disabled {
   opacity: 0.85;
 }
 
+.report-mode-picker {
+  align-items: stretch;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  display: grid;
+  flex: 0 0 auto;
+  grid-template-columns: repeat(3, minmax(64px, auto));
+  min-height: 38px;
+  padding: 3px;
+}
+
+.report-mode-option {
+  background: transparent;
+  border: 0;
+  border-radius: 7px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  min-width: 68px;
+  padding: 0 10px;
+  transition:
+    background 160ms ease,
+    box-shadow 160ms ease,
+    color 160ms ease;
+}
+
+.report-mode-option:hover:not(.active) {
+  color: var(--ink-2);
+}
+
+.report-mode-option.active {
+  background: var(--surface);
+  box-shadow: 0 1px 3px rgba(27, 37, 48, 0.14);
+  color: var(--accent-strong);
+}
+
+.report-mode-option:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
 .filter-divider {
   align-self: stretch;
   background: var(--hairline);

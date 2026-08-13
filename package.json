@@ -1,7 +1,7 @@
 {
   "name": "qaqc-weekly-report-dashboard",
   "private": true,
-  "version": "1.0.30",
+  "version": "1.0.31",
   "type": "module",
   "repository": {
     "type": "git",
@@ -14,7 +14,8 @@
     "typecheck": "tsc -b",
     "test:acc-metadata": "node scripts/verify-acc-metadata.mjs",
     "test:manual-issues": "node scripts/verify-manual-issues-update.mjs",
-    "test:pending-status": "node scripts/verify-pending-status.mjs"
+    "test:pending-status": "node scripts/verify-pending-status.mjs",
+    "test:justine-mode": "node scripts/verify-justine-mode.mjs"
   },
   "dependencies": {
     "fflate": "^0.8.3",

@@ -43,6 +43,7 @@ const START_WEEK = 'WW51\'2025'
 
 const EMPTY_FILTERS: ReportFilters = {
   oac: true,
+  reportingMode: 'oac',
   workWeeks: [],
   disciplines: [],
   contractors: [],
@@ -290,6 +291,22 @@ function countClosedIn(issues: IssueRecord[], week: WorkWeek): number {
   ).length
 }
 
+function isWeekInRange(week: WorkWeek | null, start: WorkWeek, end: WorkWeek): boolean {
+  return Boolean(
+    week
+    && compareWorkWeeks(week, start) >= 0
+    && compareWorkWeeks(week, end) <= 0,
+  )
+}
+
+function countOpenedBetween(issues: IssueRecord[], start: WorkWeek, end: WorkWeek): number {
+  return issues.filter((issue) => issue.statusKind !== 'void' && isWeekInRange(issue.createdWeek, start, end)).length
+}
+
+function countClosedBetween(issues: IssueRecord[], start: WorkWeek, end: WorkWeek): number {
+  return issues.filter((issue) => issue.statusKind === 'closed' && isWeekInRange(issue.closedWeek, start, end)).length
+}
+
 function makeMetric(
   id: string,
   label: string,
@@ -385,30 +402,31 @@ function buildAging(issues: IssueRecord[], today: Date): AgingBucket[] {
 function buildIssueTable(
   issues: IssueRecord[],
   currentWeek: WorkWeek,
-  reportWeek: WorkWeek,
+  periodStart: WorkWeek,
+  periodEnd: WorkWeek,
   activityWindowOnly: boolean,
 ): IssueDetailRow[] {
   return issues
     .filter((issue) => {
       if (issue.statusKind === 'void' || !issue.createdWeek) return false
-      const openedInReport = issue.createdWeek.label === reportWeek.label
-      const closedInReport = issue.closedWeek?.label === reportWeek.label
+      const openedInReport = isWeekInRange(issue.createdWeek, periodStart, periodEnd)
+      const closedInReport = isWeekInRange(issue.closedWeek, periodStart, periodEnd)
       const closedThisWeek = issue.closedWeek?.label === currentWeek.label
       if (activityWindowOnly) return openedInReport || closedInReport || closedThisWeek
 
-      const createdThroughReport = compareWorkWeeks(issue.createdWeek, reportWeek) <= 0
+      const createdThroughReport = compareWorkWeeks(issue.createdWeek, periodEnd) <= 0
       if (issue.statusKind !== 'closed') return createdThroughReport
       if (closedInReport) return true
       if (openedInReport && closedInReport) return true
       return !!closedThisWeek && compareWorkWeeks(issue.createdWeek, currentWeek) < 0
     })
     .map((issue) => {
-      const openedInReport = issue.createdWeek?.label === reportWeek.label
-      const closedInReport = issue.closedWeek?.label === reportWeek.label
+      const openedInReport = isWeekInRange(issue.createdWeek, periodStart, periodEnd)
+      const closedInReport = isWeekInRange(issue.closedWeek, periodStart, periodEnd)
       let group: IssueDetailRow['group'] = 'Open Carryover'
       if (issue.statusKind === 'closed' && openedInReport && closedInReport) group = 'Opened + Closed in Report Week'
-      else if (issue.statusKind === 'closed' && closedInReport) group = 'Closed in Report Week'
       else if (issue.statusKind === 'closed' && issue.closedWeek?.label === currentWeek.label) group = 'Closed This Week'
+      else if (issue.statusKind === 'closed' && closedInReport) group = 'Closed in Report Week'
       else if (openedInReport) group = 'Opened in Report Week'
       return {
         id: issue.id,
@@ -467,10 +485,12 @@ function sheetHealth(bundle: SheetBundle): Record<SheetRole, boolean> {
 }
 
 export function mergeFilters(saved: Partial<ReportFilters>): ReportFilters {
+  const reportingMode = saved.reportingMode ?? (saved.oac === false ? 'manual' : 'oac')
   return {
     ...EMPTY_FILTERS,
     ...saved,
-    oac: saved.oac ?? true,
+    reportingMode,
+    oac: reportingMode !== 'manual',
   }
 }
 
@@ -480,9 +500,20 @@ export function buildReportModel(
   now = new Date(),
 ): ReportModel {
   const currentWeek = toIsoWorkWeek(now)
-  const reportWeek = filtersInput.oac ? previousWorkWeek(currentWeek) : currentWeek
-  const previousReport = previousWorkWeek(reportWeek)
-  const cutoffDate = filtersInput.oac ? workWeekEnd(reportWeek) : now
+  const reportingMode = filtersInput.reportingMode
+  const periodEnd = reportingMode === 'justine'
+    ? currentWeek
+    : filtersInput.oac ? previousWorkWeek(currentWeek) : currentWeek
+  const periodStart = reportingMode === 'justine' ? previousWorkWeek(currentWeek) : periodEnd
+  const reportWeek = periodEnd
+  const previousReport = previousWorkWeek(periodStart)
+  const previousPeriodStart = reportingMode === 'justine'
+    ? previousWorkWeek(previousReport)
+    : previousReport
+  const cutoffDate = reportingMode === 'justine' || !filtersInput.oac ? now : workWeekEnd(reportWeek)
+  const periodLabel = periodStart.label === periodEnd.label
+    ? periodEnd.label
+    : `${periodStart.label} + ${periodEnd.label}`
 
   const allIssues = bundle.sheets.bimIssues.rows.filter(shouldIncludeIssue).map(normalizeIssue)
   const allMechanical = bundle.sheets.mechanical.rows.map(normalizeInspection)
@@ -509,16 +540,16 @@ export function buildReportModel(
   const previousTotalOpened = countOpenedThrough(issues, previousReport)
   const totalClosed = countClosedThrough(issues, reportWeek)
   const previousTotalClosed = countClosedThrough(issues, previousReport)
-  const openedWeek = countOpenedIn(issues, reportWeek)
-  const openedPreviousWeek = countOpenedIn(issues, previousReport)
-  const closedWeek = countClosedIn(issues, reportWeek)
-  const closedPreviousWeek = countClosedIn(issues, previousReport)
+  const openedWeek = countOpenedBetween(issues, periodStart, periodEnd)
+  const openedPreviousWeek = countOpenedBetween(issues, previousPeriodStart, previousReport)
+  const closedWeek = countClosedBetween(issues, periodStart, periodEnd)
+  const closedPreviousWeek = countClosedBetween(issues, previousPeriodStart, previousReport)
   const remaining = totalOpened - totalClosed
   const previousRemaining = previousTotalOpened - previousTotalClosed
-  const inspectionsWeek = inspections.filter((row) => row.workWeek?.label === reportWeek.label && phaseEquals(row.phase, 'Final')).length
-  const inspectionsPrevious = inspections.filter((row) => row.workWeek?.label === previousReport.label && phaseEquals(row.phase, 'Final')).length
-  const sorsWeek = inspections.filter((row) => row.workWeek?.label === reportWeek.label && includesPhase(row.phase, 'SOR')).length
-  const sorsPrevious = inspections.filter((row) => row.workWeek?.label === previousReport.label && includesPhase(row.phase, 'SOR')).length
+  const inspectionsWeek = inspections.filter((row) => isWeekInRange(row.workWeek, periodStart, periodEnd) && phaseEquals(row.phase, 'Final')).length
+  const inspectionsPrevious = inspections.filter((row) => isWeekInRange(row.workWeek, previousPeriodStart, previousReport) && phaseEquals(row.phase, 'Final')).length
+  const sorsWeek = inspections.filter((row) => isWeekInRange(row.workWeek, periodStart, periodEnd) && includesPhase(row.phase, 'SOR')).length
+  const sorsPrevious = inspections.filter((row) => isWeekInRange(row.workWeek, previousPeriodStart, previousReport) && includesPhase(row.phase, 'SOR')).length
   const closureRate = totalOpened ? (totalClosed / totalOpened) * 100 : 0
   const previousClosureRate = previousTotalOpened ? (previousTotalClosed / previousTotalOpened) * 100 : 0
 
@@ -574,10 +605,32 @@ export function buildReportModel(
 
   const electrical = buildElectrical(electricalRecords, reportWeek)
   const welding = buildWelding(welds, reportWeek)
-  const reportElectrical = electrical.find((point) => point.workWeek === reportWeek.label)
-  const prevElectrical = electrical.find((point) => point.workWeek === previousReport.label)
-  const reportWeld = welding.find((point) => point.workWeek === reportWeek.label)
-  const prevWeld = welding.find((point) => point.workWeek === previousReport.label)
+  const reportElectricalPoints = electrical.filter((point) => isWeekInRange(parseWorkWeek(point.workWeek), periodStart, periodEnd))
+  const previousElectricalPoints = electrical.filter((point) => isWeekInRange(parseWorkWeek(point.workWeek), previousPeriodStart, previousReport))
+  const reportWeldPoints = welding.filter((point) => isWeekInRange(parseWorkWeek(point.workWeek), periodStart, periodEnd))
+  const previousWeldPoints = welding.filter((point) => isWeekInRange(parseWorkWeek(point.workWeek), previousPeriodStart, previousReport))
+  const reportElectrical = {
+    finals: reportElectricalPoints.reduce((sum, point) => sum + point.finals, 0),
+    issuesFound: reportElectricalPoints.reduce((sum, point) => sum + point.issuesFound, 0),
+  }
+  const prevElectrical = {
+    finals: previousElectricalPoints.reduce((sum, point) => sum + point.finals, 0),
+    issuesFound: previousElectricalPoints.reduce((sum, point) => sum + point.issuesFound, 0),
+  }
+  const reportWeldTotal = reportWeldPoints.reduce((sum, point) => sum + point.total, 0)
+  const reportWeldSigned = reportWeldPoints.reduce((sum, point) => sum + point.signed, 0)
+  const previousWeldTotal = previousWeldPoints.reduce((sum, point) => sum + point.total, 0)
+  const previousWeldSigned = previousWeldPoints.reduce((sum, point) => sum + point.signed, 0)
+  const reportWeld = {
+    total: reportWeldTotal,
+    signed: reportWeldSigned,
+    signoffRate: reportWeldTotal ? (reportWeldSigned / reportWeldTotal) * 100 : 0,
+  }
+  const prevWeld = {
+    total: previousWeldTotal,
+    signed: previousWeldSigned,
+    signoffRate: previousWeldTotal ? (previousWeldSigned / previousWeldTotal) * 100 : 0,
+  }
   const weldingWeeksWithData = welding.filter((point) => point.total > 0)
   const overallSignoffRate = weldingWeeksWithData.length
     ? weldingWeeksWithData.reduce((sum, point) => sum + point.signoffRate, 0) / weldingWeeksWithData.length
@@ -585,9 +638,13 @@ export function buildReportModel(
 
   return {
     generatedAt: now,
+    reportingMode,
     currentWeek,
     reportWeek,
     previousReportWeek: previousReport,
+    periodStartWeek: periodStart,
+    periodEndWeek: periodEnd,
+    periodLabel,
     cutoffDate,
     source: bundle.source,
     sheetHealth: sheetHealth(bundle),
@@ -600,7 +657,8 @@ export function buildReportModel(
     issueTable: buildIssueTable(
       allIssues.filter((issue) => passesIssueFilters(issue, { ...filters, oac: false, workWeeks: [] }, reportWeek)),
       currentWeek,
-      reportWeek,
+      periodStart,
+      periodEnd,
       filters.oac,
     ),
     electrical,

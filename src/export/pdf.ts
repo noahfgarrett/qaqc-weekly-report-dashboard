@@ -101,5 +101,5 @@ export async function exportSlidesPdf(report: ReportModel): Promise<void> {
     captureDeck.remove()
   }
 
-  pdf.save(`QAQC Weekly Report ${report.reportWeek.label.replace("'", '-')}.pdf`)
+  pdf.save(`QAQC Weekly Report ${report.periodLabel.replace(/'/g, '-')}.pdf`)
 }

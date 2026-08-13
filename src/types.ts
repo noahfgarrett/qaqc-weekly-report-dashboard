@@ -35,8 +35,11 @@ export interface WorkWeek {
   key: number
 }
 
+export type ReportingMode = 'oac' | 'justine' | 'manual'
+
 export interface ReportFilters {
   oac: boolean
+  reportingMode: ReportingMode
   workWeeks: string[]
   disciplines: string[]
   contractors: string[]
@@ -113,9 +116,13 @@ export interface WeldingPoint {
 
 export interface ReportModel {
   generatedAt: Date
+  reportingMode: ReportingMode
   currentWeek: WorkWeek
   reportWeek: WorkWeek
   previousReportWeek: WorkWeek
+  periodStartWeek: WorkWeek
+  periodEndWeek: WorkWeek
+  periodLabel: string
   cutoffDate: Date
   source: 'empty' | 'demo' | 'files'
   sheetHealth: Record<SheetRole, boolean>

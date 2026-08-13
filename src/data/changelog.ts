@@ -7,6 +7,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.0.31',
+    date: '2026-08-13T18:01:57Z',
+    type: 'feature',
+    notes: [
+      'Added a persistent Justine reporting mode beside OAC and Manual in the weekly report toolbar',
+      'Justine combines the previous and current work weeks across issue, inspection, SOR, electrical, and welding summaries',
+      'Dashboard, BIM Issues Detail, PDF, and PowerPoint exports now share the selected reporting period and comparison window',
+    ],
+  },
+  {
     version: '1.0.30',
     date: '2026-08-11T13:35:46Z',
     type: 'fix',
