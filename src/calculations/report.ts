@@ -120,6 +120,12 @@ function legacyIssueValue(row: Record<string, unknown>, field: 'createdBy' | 'cr
   return value(row, ['BIM360_Closed On', 'BIM360 Closed On'])
 }
 
+function issueContractor(id: string, contractor: string): string {
+  const populated = contractor.trim()
+  if (populated) return populated
+  return id.match(/\d+$/)?.[0] === '1021' ? 'Bechtel' : 'Unassigned'
+}
+
 function shouldIncludeIssue(row: Record<string, unknown>): boolean {
   const legacyCreatedBy = legacyIssueValue(row, 'createdBy').trim()
   const hasLegacyData = Boolean(
@@ -136,6 +142,7 @@ function shouldIncludeIssue(row: Record<string, unknown>): boolean {
 }
 
 function normalizeIssue(row: Record<string, unknown>): IssueRecord {
+  const id = value(row, ['ID', 'Issue ID', 'BIM ID']) || String(row.__rowNumber ?? row.__rowId ?? '')
   const rawStatus = value(row, ['Status']).trim() || 'Open'
   const statusKind = normalizeStatus(rawStatus)
   const status = statusKind === 'pending' ? 'Pending' : rawStatus
@@ -146,12 +153,12 @@ function normalizeIssue(row: Record<string, unknown>): IssueRecord {
   const updatedOn = parseDate(legacyClosedOn || closedAt || value(row, ['Updated On', 'Updated', 'Closed On', 'Date Closed']))
   const accType = value(row, ['Type']).trim()
   return {
-    id: value(row, ['ID', 'Issue ID', 'BIM ID']) || String(row.__rowNumber ?? row.__rowId ?? ''),
+    id,
     status,
     statusKind,
     subtype: accType || value(row, ['Subtype', 'Sub Type', 'Issue Subtype']) || 'Uncategorized',
     title: value(row, ['Title', 'Issue', 'Description']) || 'Untitled issue',
-    contractor: value(row, ['Contractor', 'Responsible Contractor']) || 'Unassigned',
+    contractor: issueContractor(id, value(row, ['Contractor', 'Responsible Contractor'])),
     discipline: value(row, ['Discipline', 'Trade']) || 'Unassigned',
     createdOn,
     updatedOn,

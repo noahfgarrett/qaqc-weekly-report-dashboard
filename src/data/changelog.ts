@@ -14,6 +14,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Manual Issues Update now carries historical BIM ownership, Created On, and derived closed dates into the enriched ACC copy',
       'Historical Updated On becomes the driving closed date only when the matching BIM issue was Closed; open issues retain ACC closure timing',
       'Matched historical dates take priority, while unmatched ACC issues use Created On, Closed at, and Updated on fallbacks',
+      'Issue #1021 uses Bechtel when its Contractor is blank, while any future populated Contractor remains authoritative',
     ],
   },
   {

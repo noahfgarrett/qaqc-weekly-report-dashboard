@@ -196,6 +196,43 @@ const unchangedClosure = closureMetric(reportForIssues(priorWeekIssues))
 if (unchangedClosure?.rawValue !== 50 || unchangedClosure.tone !== 'neutral') {
   throw new Error('An unchanged Closure Rate must use the neutral tone.')
 }
+
+const contractorFallbackBundle = {
+  ...bundle,
+  sheets: {
+    ...bundle.sheets,
+    bimIssues: {
+      id: 'contractor-fallback',
+      name: 'ACC Issues Export',
+      rows: [
+        { ID: '#1021', Status: 'Open', 'Created On': '2026-08-05', 'Created By': 'Stuart Barrett LotusWorks', Contractor: '', Discipline: '' },
+        { ID: 'BIM-1021', Status: 'Open', 'Created On': '2026-08-05', 'Created By': 'Stuart Barrett LotusWorks', Contractor: 'Future Contractor', Discipline: '' },
+      ],
+    },
+  },
+}
+const contractorFallbackReport = buildReportModel(
+  contractorFallbackBundle,
+  mergeFilters({ oac: true }),
+  new Date(2026, 7, 11, 12),
+)
+if (!contractorFallbackReport.filterOptions.contractors.includes('Bechtel')) {
+  throw new Error('Blank Contractor on issue #1021 did not fall back to Bechtel.')
+}
+if (!contractorFallbackReport.filterOptions.contractors.includes('Future Contractor')) {
+  throw new Error('A populated Contractor on issue #1021 was overwritten by the fallback.')
+}
+const bechtelOnly = buildReportModel(
+  contractorFallbackBundle,
+  mergeFilters({ oac: true, contractors: ['Bechtel'] }),
+  new Date(2026, 7, 11, 12),
+)
+if (bechtelOnly.kpis.find((item) => item.id === 'total-opened')?.rawValue !== 1) {
+  throw new Error('The #1021 Bechtel fallback did not participate in Contractor filtering.')
+}
+if (!contractorFallbackReport.filterOptions.disciplines.includes('Unassigned')) {
+  throw new Error('Blank issue Discipline no longer remains available as Unassigned.')
+}
 `
 
 try {
