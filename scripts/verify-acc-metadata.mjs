@@ -85,6 +85,12 @@ const bundle = {
           'BIM360_Closed On': excelSerial('2026-08-09'),
         },
         {
+          ID: '3011', Status: 'Closed', Type: 'Closure priority',
+          'Created On': '2026-07-01', 'Closed at': '2026-08-07', 'Updated On': '2026-08-11',
+          'Created By': 'LotusWorks',
+          'BIM360_Created By': '', 'BIM360_Created On': '', 'BIM360_Closed On': '',
+        },
+        {
           ID: '3012', Status: 'Open', Type: 'RFI',
           'Created On': '2026-08-09', 'Updated On': '2026-08-09', 'Issue Owner': 'LotusWorks',
           'BIM360_Created By': '', 'BIM360_Created On': '', 'BIM360_Closed On': '',
@@ -104,10 +110,10 @@ if (report.currentWeek.label !== "WW33'2026" || report.reportWeek.label !== "WW3
 
 const metric = (id) => report.kpis.find((item) => item.id === id)?.rawValue
 const expectedMetrics = new Map([
-  ['total-opened', 8],
-  ['total-closed', 3],
+  ['total-opened', 9],
+  ['total-closed', 4],
   ['opened-week', 4],
-  ['closed-week', 3],
+  ['closed-week', 4],
   ['remaining-open', 5],
 ])
 expectedMetrics.forEach((expected, id) => {
@@ -123,9 +129,10 @@ const expectedDetails = new Map([
   ['3004', ['Closed This Week', 'Closed', 'Safety', "WW27'2026", "WW33'2026"]],
   ['3006', ['Opened in Report Week', 'Open', 'Fallback subtype', "WW32'2026", 'Open']],
   ['3010', ['Closed in Report Week', 'Complete', 'Completion alias', "WW27'2026", "WW32'2026"]],
+  ['3011', ['Closed in Report Week', 'Closed', 'Closure priority', "WW27'2026", "WW32'2026"]],
   ['3012', ['Opened in Report Week', 'Open', 'RFI', "WW32'2026", 'Open']],
 ])
-if (report.issueTable.map((row) => row.id).join(',') !== '3012,3010,3006,3004,3003,3002,3001') {
+if (report.issueTable.map((row) => row.id).join(',') !== '3012,3011,3010,3006,3004,3003,3002,3001') {
   throw new Error('ACC metadata rows were not included, excluded, or sorted correctly.')
 }
 report.issueTable.forEach((row) => {
@@ -142,6 +149,12 @@ if (report.filterOptions.subtypes.includes('Wrong subtype')) {
 }
 if (!report.filterOptions.subtypes.includes('Fallback subtype')) {
   throw new Error('A blank ACC Type did not fall back to Subtype.')
+}
+if (report.issueTable.find((row) => row.id === '3011')?.workWeekClosed !== "WW32'2026") {
+  throw new Error('Closed at did not take priority over an Updated On value from a later work week.')
+}
+if (report.issueTable.find((row) => row.id === '3003')?.workWeekClosed !== "WW32'2026") {
+  throw new Error('A blank dedicated closure date did not fall back to Updated On.')
 }
 if (report.filterOptions.statuses.includes('Void')) {
   throw new Error('Void leaked into the status filter options.')

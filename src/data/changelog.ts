@@ -7,6 +7,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.0.32',
+    date: '2026-08-20T11:12:47Z',
+    type: 'fix',
+    notes: [
+      'Closed at is now the primary closure timestamp for closed BIM issues',
+      'Updated on remains the fallback when no dedicated closure timestamp is available',
+      'BIM360 legacy closure dates remain supported for older exports',
+    ],
+  },
+  {
     version: '1.0.31',
     date: '2026-08-13T18:01:57Z',
     type: 'feature',
