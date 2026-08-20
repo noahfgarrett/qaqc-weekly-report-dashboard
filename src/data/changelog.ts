@@ -7,14 +7,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.32',
-    date: '2026-08-20T11:12:47Z',
-    type: 'fix',
+    version: '1.1.0',
+    date: '2026-08-20T11:48:01Z',
+    type: 'major',
     notes: [
       'Manual Issues Update now carries historical BIM ownership, Created On, and derived closed dates into the enriched ACC copy',
       'Historical Updated On becomes the driving closed date only when the matching BIM issue was Closed; open issues retain ACC closure timing',
       'Matched historical dates take priority, while unmatched ACC issues use Created On, Closed at, and Updated on fallbacks',
       'Issue #1021 uses Bechtel when its Contractor is blank, while any future populated Contractor remains authoritative',
+      'The latest raw ACC export was reconciled row by row against BIM Issues Detail with no missing, unexpected, or misclassified report activity',
     ],
   },
   {
