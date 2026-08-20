@@ -810,7 +810,7 @@ select:disabled {
 .manual-summary-grid {
   display: grid;
   gap: 12px;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   margin-top: 16px;
 }
 
@@ -893,7 +893,7 @@ select:disabled {
 
 .manual-issues-table {
   border-collapse: collapse;
-  min-width: 720px;
+  min-width: 960px;
   table-layout: fixed;
   width: 100%;
 }
@@ -932,7 +932,17 @@ select:disabled {
 
 .manual-issues-table th:nth-child(3),
 .manual-issues-table td:nth-child(3) {
-  width: 210px;
+  width: 170px;
+}
+
+.manual-issues-table th:nth-child(4),
+.manual-issues-table td:nth-child(4) {
+  width: 160px;
+}
+
+.manual-issues-table th:nth-child(5),
+.manual-issues-table td:nth-child(5) {
+  width: 220px;
 }
 
 .manual-issues-table tbody tr:hover {

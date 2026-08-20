@@ -1,8 +1,9 @@
 import * as XLSX from 'xlsx'
+import { parseDate } from '@/utils/workWeeks'
 
 export type ManualIssueWorkbookKind = 'current' | 'acc'
 export type ManualIssueField = 'id' | 'contractor' | 'discipline'
-export type EnrichedIssueField = 'contractor' | 'discipline'
+export type EnrichedIssueField = 'contractor' | 'discipline' | 'createdBy' | 'createdOn' | 'closedOn'
 
 interface IssueFieldDefinition {
   key: ManualIssueField
@@ -35,6 +36,9 @@ export interface ManualIssueEnrichment {
   targetRow: number
   contractor: string
   discipline: string
+  createdBy: string
+  createdOn: Date | null
+  closedOn: Date | null
   filledFields: EnrichedIssueField[]
 }
 
@@ -48,6 +52,9 @@ export interface ManualIssueAnalysis {
   duplicateCurrentIds: number
   filledContractors: number
   filledDisciplines: number
+  enrichedCreators: number
+  enrichedCreatedDates: number
+  enrichedClosedDates: number
   changes: ManualIssueEnrichment[]
 }
 
@@ -75,6 +82,25 @@ function idKey(value: unknown): string {
 
 function isBlank(value: unknown): boolean {
   return value === null || value === undefined || String(value).trim() === ''
+}
+
+function rowValueByAliases(row: Record<string, unknown>, aliases: string[]): unknown {
+  const valuesByHeader = new Map(Object.entries(row).map(([header, value]) => [normalized(header), value]))
+  for (const alias of aliases) {
+    const value = valuesByHeader.get(normalized(alias))
+    if (!isBlank(value)) return value
+  }
+  return ''
+}
+
+function datesMatch(left: Date | null, rightValue: unknown): boolean {
+  const right = parseDate(rightValue)
+  return left === null ? right === null : right?.getTime() === left.getTime()
+}
+
+function statusIsClosed(value: unknown): boolean {
+  const status = String(value ?? '').trim().toLowerCase()
+  return status === 'closed' || status === 'complete' || status === 'completed'
 }
 
 function extension(fileName: string): string {
@@ -223,6 +249,9 @@ export function reconcileIssueRows(
   let missingIdRows = 0
   let filledContractors = 0
   let filledDisciplines = 0
+  let enrichedCreators = 0
+  let enrichedCreatedDates = 0
+  let enrichedClosedDates = 0
 
   acc.rows.forEach((row) => {
     const id = displayValue(rowValue(acc, row, 'id'))
@@ -243,6 +272,31 @@ export function reconcileIssueRows(
     const currentDiscipline = displayValue(rowValue(current, currentRow, 'discipline'))
     const accContractor = displayValue(rowValue(acc, row, 'contractor'))
     const accDiscipline = displayValue(rowValue(acc, row, 'discipline'))
+    const currentCreatedBy = displayValue(rowValueByAliases(currentRow, [
+      'BIM360_Created By',
+      'BIM360 Created By',
+      'Created By',
+      'Issue Owner',
+    ])) || 'LotusWorks (BIM Issues Log)'
+    const currentCreatedOn = parseDate(rowValueByAliases(currentRow, [
+      'BIM360_Created On',
+      'BIM360 Created On',
+      'Created On',
+      'Created',
+      'Date Created',
+    ]))
+    const currentClosedOn = statusIsClosed(rowValueByAliases(currentRow, ['Status']))
+      ? parseDate(rowValueByAliases(currentRow, [
+          'BIM360_Closed On',
+          'BIM360 Closed On',
+          'Closed At',
+          'Updated On',
+          'Updated',
+        ]))
+      : null
+    const accLegacyCreatedBy = displayValue(rowValueByAliases(row, ['BIM360_Created By', 'BIM360 Created By']))
+    const accLegacyCreatedOn = rowValueByAliases(row, ['BIM360_Created On', 'BIM360 Created On'])
+    const accLegacyClosedOn = rowValueByAliases(row, ['BIM360_Closed On', 'BIM360 Closed On'])
     const filledFields: EnrichedIssueField[] = []
 
     if (isBlank(accContractor) && !isBlank(currentContractor)) {
@@ -252,6 +306,18 @@ export function reconcileIssueRows(
     if (isBlank(accDiscipline) && !isBlank(currentDiscipline)) {
       filledFields.push('discipline')
       filledDisciplines += 1
+    }
+    if (accLegacyCreatedBy !== currentCreatedBy) {
+      filledFields.push('createdBy')
+      enrichedCreators += 1
+    }
+    if (currentCreatedOn && !datesMatch(currentCreatedOn, accLegacyCreatedOn)) {
+      filledFields.push('createdOn')
+      enrichedCreatedDates += 1
+    }
+    if (currentClosedOn && !datesMatch(currentClosedOn, accLegacyClosedOn)) {
+      filledFields.push('closedOn')
+      enrichedClosedDates += 1
     }
 
     if (filledFields.length === 0) {
@@ -264,6 +330,9 @@ export function reconcileIssueRows(
       targetRow: Number(row.__rowNumber ?? 0) - 1,
       contractor: filledFields.includes('contractor') ? currentContractor : accContractor,
       discipline: filledFields.includes('discipline') ? currentDiscipline : accDiscipline,
+      createdBy: currentCreatedBy,
+      createdOn: currentCreatedOn,
+      closedOn: currentClosedOn,
       filledFields,
     })
   })
@@ -278,6 +347,9 @@ export function reconcileIssueRows(
     duplicateCurrentIds,
     filledContractors,
     filledDisciplines,
+    enrichedCreators,
+    enrichedCreatedDates,
+    enrichedClosedDates,
     changes,
   }
 }
@@ -287,11 +359,44 @@ function cloneStyle<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T
 }
 
-function makeCell(value: string, template?: XLSX.CellObject): XLSX.CellObject {
-  const cell: XLSX.CellObject = { t: 's', v: value }
+function makeCell(value: string | Date, template?: XLSX.CellObject): XLSX.CellObject {
+  const cell: XLSX.CellObject = value instanceof Date
+    ? { t: 'd', v: value, z: template?.z || 'm/d/yyyy' }
+    : { t: 's', v: value }
   if (template?.s) cell.s = cloneStyle(template.s)
-  if (template?.z) cell.z = template.z
+  if (template?.z && !(value instanceof Date)) cell.z = template.z
   return cell
+}
+
+const ENRICHMENT_COLUMNS: Record<Exclude<EnrichedIssueField, 'contractor' | 'discipline'>, { header: string; aliases: string[] }> = {
+  createdBy: { header: 'BIM360_Created By', aliases: ['BIM360_Created By', 'BIM360 Created By'] },
+  createdOn: { header: 'BIM360_Created On', aliases: ['BIM360_Created On', 'BIM360 Created On'] },
+  closedOn: { header: 'BIM360_Closed On', aliases: ['BIM360_Closed On', 'BIM360 Closed On'] },
+}
+
+function ensureEnrichmentColumn(
+  worksheet: XLSX.WorkSheet,
+  headerRow: number,
+  definition: { header: string; aliases: string[] },
+): number {
+  const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1:A1')
+  const aliasSet = new Set(definition.aliases.map(normalized))
+  for (let column = range.s.c; column <= range.e.c; column += 1) {
+    const cell = worksheet[XLSX.utils.encode_cell({ r: headerRow, c: column })]
+    if (cell && aliasSet.has(normalized(cell.v))) return column
+  }
+
+  const column = range.e.c + 1
+  const headerTemplate = worksheet[XLSX.utils.encode_cell({ r: headerRow, c: range.e.c })]
+  worksheet[XLSX.utils.encode_cell({ r: headerRow, c: column })] = makeCell(definition.header, headerTemplate)
+  range.e.c = column
+  worksheet['!ref'] = XLSX.utils.encode_range(range)
+  if (worksheet['!autofilter']?.ref) {
+    const filterRange = XLSX.utils.decode_range(worksheet['!autofilter'].ref)
+    filterRange.e.c = Math.max(filterRange.e.c, column)
+    worksheet['!autofilter'].ref = XLSX.utils.encode_range(filterRange)
+  }
+  return column
 }
 
 function enrichedFileName(fileName: string): string {
@@ -312,11 +417,26 @@ export function buildUpdatedIssueWorkbook(
   const worksheet = workbook.Sheets[acc.worksheetName]
   if (!worksheet) throw new Error('The ACC Issues Export worksheet is no longer available.')
 
+  const enrichmentColumns = new Map<EnrichedIssueField, number>([
+    ['contractor', acc.fieldColumns.contractor],
+    ['discipline', acc.fieldColumns.discipline],
+  ])
+  Object.entries(ENRICHMENT_COLUMNS).forEach(([field, definition]) => {
+    if (!analysis.changes.some((change) => change.filledFields.includes(field as EnrichedIssueField))) return
+    enrichmentColumns.set(
+      field as EnrichedIssueField,
+      ensureEnrichmentColumn(worksheet, acc.headerRow, definition),
+    )
+  })
+
   analysis.changes.forEach((change) => {
     change.filledFields.forEach((field) => {
-      const column = acc.fieldColumns[field]
+      const column = enrichmentColumns.get(field)
+      if (column === undefined) return
       const address = XLSX.utils.encode_cell({ r: change.targetRow, c: column })
-      worksheet[address] = makeCell(change[field], worksheet[address])
+      const value = change[field]
+      if (value === null) return
+      worksheet[address] = makeCell(value, worksheet[address])
     })
   })
 

@@ -143,7 +143,7 @@ function normalizeIssue(row: Record<string, unknown>): IssueRecord {
   const legacyClosedOn = legacyIssueValue(row, 'closedOn').trim()
   const closedAt = value(row, ['Closed At']).trim()
   const createdOn = parseDate(legacyCreatedOn || value(row, ['Created On', 'Created', 'Date Created']))
-  const updatedOn = parseDate(closedAt || legacyClosedOn || value(row, ['Updated On', 'Updated', 'Closed On', 'Date Closed']))
+  const updatedOn = parseDate(legacyClosedOn || closedAt || value(row, ['Updated On', 'Updated', 'Closed On', 'Date Closed']))
   const accType = value(row, ['Type']).trim()
   return {
     id: value(row, ['ID', 'Issue ID', 'BIM ID']) || String(row.__rowNumber ?? row.__rowId ?? ''),

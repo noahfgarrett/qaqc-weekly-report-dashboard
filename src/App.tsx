@@ -38,6 +38,8 @@ import {
   downloadUpdatedIssueWorkbook,
   prepareIssueWorkbook,
   reconcileIssueRows,
+  type EnrichedIssueField,
+  type ManualIssueEnrichment,
   type ManualIssueWorkbookKind,
   type PreparedIssueWorkbook,
 } from '@/services/manualIssuesUpdate'
@@ -60,7 +62,7 @@ import type {
   WeldingPoint,
 } from '@/types'
 import { compactNumber, deltaLabel, percent } from '@/utils/format'
-import { compareWorkWeeks } from '@/utils/workWeeks'
+import { compareWorkWeeks, formatDate } from '@/utils/workWeeks'
 
 const ROLE_CONFIG: Record<SheetRole, { label: string; icon: typeof AlertCircle; color: string }> = {
   bimIssues: { label: 'BIM Issues Log', icon: AlertCircle, color: '#38bdf8' },
@@ -1378,6 +1380,30 @@ function ManualIssueFileSlot({
   )
 }
 
+const ENRICHED_FIELD_LABELS: Record<EnrichedIssueField, string> = {
+  contractor: 'Contractor',
+  discipline: 'Discipline',
+  createdBy: 'BIM owner',
+  createdOn: 'Created date',
+  closedOn: 'Closed date',
+}
+
+function enrichedFieldList(fields: EnrichedIssueField[]): string {
+  return fields.map((field) => ENRICHED_FIELD_LABELS[field]).join(' + ')
+}
+
+function drivingDateSummary(change: ManualIssueEnrichment): string {
+  const dates = [
+    change.filledFields.includes('createdOn') && change.createdOn
+      ? `Created ${formatDate(change.createdOn)}`
+      : '',
+    change.filledFields.includes('closedOn') && change.closedOn
+      ? `Closed ${formatDate(change.closedOn)}`
+      : '',
+  ].filter(Boolean)
+  return dates.join(' · ') || 'No date change'
+}
+
 function ManualIssuesUpdate() {
   const currentInputRef = useRef<HTMLInputElement>(null)
   const accInputRef = useRef<HTMLInputElement>(null)
@@ -1475,7 +1501,7 @@ function ManualIssuesUpdate() {
       <div className="manual-file-grid">
         <ManualIssueFileSlot
           kind="current"
-          title="Current Reference Log"
+          title="Historical BIM Issues Log"
           workbook={current}
           loading={loading === 'current'}
           onChoose={() => currentInputRef.current?.click()}
@@ -1522,6 +1548,14 @@ function ManualIssuesUpdate() {
               <strong>{analysis.filledDisciplines.toLocaleString()}</strong>
               <small>blank ACC cells</small>
             </article>
+            <article className="new-issues">
+              <span>Driving dates</span>
+              <strong>{(analysis.enrichedCreatedDates + analysis.enrichedClosedDates).toLocaleString()}</strong>
+              <small>
+                {analysis.enrichedCreatedDates.toLocaleString()} created ·{' '}
+                {analysis.enrichedClosedDates.toLocaleString()} closed
+              </small>
+            </article>
           </div>
 
           <div className="manual-results-panel">
@@ -1559,15 +1593,17 @@ function ManualIssuesUpdate() {
                       <th>Filled fields</th>
                       <th>Contractor</th>
                       <th>Discipline</th>
+                      <th>Driving dates</th>
                     </tr>
                   </thead>
                   <tbody>
                     {issueChanges.map((change) => (
                       <tr key={`${change.id}-${change.targetRow}`}>
                         <td><strong>{change.id}</strong></td>
-                        <td>{change.filledFields.map((field) => field === 'contractor' ? 'Contractor' : 'Discipline').join(' + ')}</td>
+                        <td>{enrichedFieldList(change.filledFields)}</td>
                         <td>{change.contractor || '—'}</td>
                         <td>{change.discipline || '—'}</td>
+                        <td>{drivingDateSummary(change)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -1576,7 +1612,7 @@ function ManualIssuesUpdate() {
             ) : (
               <div className="manual-empty-result">
                 <CheckCircle2 size={24} />
-                <strong>Every matching ACC row already has Contractor and Discipline.</strong>
+                <strong>Every matching ACC row already has the latest reference metadata.</strong>
               </div>
             )}
 
@@ -1611,7 +1647,8 @@ function ManualIssuesUpdate() {
                 </strong>
                 <small>
                   {analysis.filledContractors.toLocaleString()} Contractor cells ·{' '}
-                  {analysis.filledDisciplines.toLocaleString()} Discipline cells
+                  {analysis.filledDisciplines.toLocaleString()} Discipline cells ·{' '}
+                  {(analysis.enrichedCreatedDates + analysis.enrichedClosedDates).toLocaleString()} driving dates
                 </small>
               </span>
             </div>
@@ -1628,8 +1665,8 @@ function ManualIssuesUpdate() {
                 {issueChanges.slice(0, 8).map((change) => (
                   <div key={`summary-${change.id}-${change.targetRow}`}>
                     <strong>{change.id}</strong>
-                    <span>{change.contractor || 'No Contractor'} · {change.discipline || 'No Discipline'}</span>
-                    <small>{change.filledFields.map((field) => field === 'contractor' ? 'Contractor' : 'Discipline').join(' + ')}</small>
+                    <span>{drivingDateSummary(change)}</span>
+                    <small>{enrichedFieldList(change.filledFields)}</small>
                   </div>
                 ))}
                 {issueChanges.length > 8 && (

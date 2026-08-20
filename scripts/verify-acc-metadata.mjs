@@ -32,7 +32,7 @@ const bundle = {
         },
         {
           ID: '3002', Status: 'Closed', Type: 'Access',
-          'Created On': '2026-07-24', 'Updated On': '2026-07-24',
+          'Created On': '2026-07-24', 'Closed at': '2026-08-11', 'Updated On': '2026-07-24',
           'BIM360_Created By': 'LotusWorks', 'BIM360_Created On': '2026-08-05',
           'BIM360_Closed On': '2026-08-07',
         },
@@ -152,6 +152,9 @@ if (!report.filterOptions.subtypes.includes('Fallback subtype')) {
 }
 if (report.issueTable.find((row) => row.id === '3011')?.workWeekClosed !== "WW32'2026") {
   throw new Error('Closed at did not take priority over an Updated On value from a later work week.')
+}
+if (report.issueTable.find((row) => row.id === '3002')?.workWeekClosed !== "WW32'2026") {
+  throw new Error('A historical BIM closure date did not take priority over ACC Closed at and Updated On.')
 }
 if (report.issueTable.find((row) => row.id === '3003')?.workWeekClosed !== "WW32'2026") {
   throw new Error('A blank dedicated closure date did not fall back to Updated On.')

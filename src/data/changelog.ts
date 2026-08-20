@@ -11,9 +11,9 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: '2026-08-20T11:12:47Z',
     type: 'fix',
     notes: [
-      'Closed at is now the primary closure timestamp for closed BIM issues',
-      'Updated on remains the fallback when no dedicated closure timestamp is available',
-      'BIM360 legacy closure dates remain supported for older exports',
+      'Manual Issues Update now carries historical BIM ownership, Created On, and derived closed dates into the enriched ACC copy',
+      'Historical Updated On becomes the driving closed date only when the matching BIM issue was Closed; open issues retain ACC closure timing',
+      'Matched historical dates take priority, while unmatched ACC issues use Created On, Closed at, and Updated on fallbacks',
     ],
   },
   {
