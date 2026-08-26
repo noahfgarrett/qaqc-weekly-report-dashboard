@@ -7,6 +7,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.1.6',
+    date: '2026-08-26T13:38:00Z',
+    type: 'fix',
+    notes: [
+      'Justine now always opens with All contractors instead of inheriting the Bechtel selection from OAC',
+      'The previous OAC contractor selection is remembered and restored when switching back to OAC',
+      'Saved Justine sessions discard stale OAC contractor restrictions while retaining every available contractor in the slicer',
+    ],
+  },
+  {
     version: '1.1.5',
     date: '2026-08-26T13:24:00Z',
     type: 'fix',

@@ -508,6 +508,7 @@ export function mergeFilters(saved: Partial<ReportFilters>): ReportFilters {
     ...saved,
     reportingMode,
     oac: reportingMode !== 'manual',
+    contractors: reportingMode === 'justine' ? [] : saved.contractors ?? EMPTY_FILTERS.contractors,
   }
 }
 

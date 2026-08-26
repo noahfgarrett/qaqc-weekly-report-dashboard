@@ -19,12 +19,12 @@ const bundle = {
       id: 'bim',
       name: 'ACC Issues Export',
       rows: [
-        { ID: '100', Status: 'Open', 'Created On': '2026-07-21' },
-        { ID: '101', Status: 'Closed', 'Created On': '2026-07-28', 'Updated On': '2026-07-30' },
-        { ID: '102', Status: 'Open', 'Created On': '2026-08-04' },
-        { ID: '103', Status: 'Closed', 'Created On': '2026-08-05', 'Updated On': '2026-08-07' },
-        { ID: '104', Status: 'Pending', 'Created On': '2026-08-10' },
-        { ID: '105', Status: 'Closed', 'Created On': '2026-07-01', 'Updated On': '2026-08-11' },
+        { ID: '100', Status: 'Open', Contractor: 'Bechtel', 'Created On': '2026-07-21' },
+        { ID: '101', Status: 'Closed', Contractor: 'Bechtel', 'Created On': '2026-07-28', 'Updated On': '2026-07-30' },
+        { ID: '102', Status: 'Open', Contractor: 'Bechtel', 'Created On': '2026-08-04' },
+        { ID: '103', Status: 'Closed', Contractor: 'Turner', 'Created On': '2026-08-05', 'Updated On': '2026-08-07' },
+        { ID: '104', Status: 'Pending', Contractor: 'Turner', 'Created On': '2026-08-10' },
+        { ID: '105', Status: 'Closed', Contractor: 'Turner', 'Created On': '2026-07-01', 'Updated On': '2026-08-11' },
       ],
     },
     mechanical: {
@@ -70,12 +70,19 @@ if (legacyOac.reportingMode !== 'oac' || legacyManual.reportingMode !== 'manual'
   throw new Error('Saved pre-Justine filter settings did not migrate correctly.')
 }
 
-const report = buildReportModel(bundle, mergeFilters({ reportingMode: 'justine' }), now)
+const justineFilters = mergeFilters({ reportingMode: 'justine', contractors: ['Bechtel'] })
+if (justineFilters.contractors.length !== 0) {
+  throw new Error('Justine retained an OAC contractor selection instead of restoring All contractors.')
+}
+const report = buildReportModel(bundle, justineFilters, now)
 if (report.reportingMode !== 'justine' || report.periodStartWeek.label !== "WW32'2026" || report.periodEndWeek.label !== "WW33'2026") {
   throw new Error('Justine did not resolve the previous-plus-current reporting period.')
 }
 if (report.periodLabel !== "WW32'2026 + WW33'2026" || report.cutoffDate.getTime() !== now.getTime()) {
   throw new Error('Justine period labeling or live cutoff is incorrect.')
+}
+if (!report.filterOptions.contractors.includes('Bechtel') || !report.filterOptions.contractors.includes('Turner')) {
+  throw new Error('Justine did not expose all available contractors.')
 }
 
 const expectedMetrics = new Map([

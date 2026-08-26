@@ -1781,6 +1781,7 @@ export default function App() {
   const [lastUpdateCheck, setLastUpdateCheck] = useState<Date | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const folderInputRef = useRef<HTMLInputElement>(null)
+  const oacContractorsRef = useRef<string[]>(filters.reportingMode === 'oac' ? filters.contractors : [])
   const dismissedUpdateVersionRef = useRef<string | null>(null)
   const importCount = Object.keys(imports).length
   const filesReady = importCount === 4
@@ -2112,11 +2113,19 @@ export default function App() {
                 key={mode}
                 aria-pressed={filters.reportingMode === mode}
                 title={mode === 'oac' ? 'Previous completed work week' : mode === 'justine' ? 'Previous and current work weeks' : 'Choose work weeks'}
-                onClick={() => setFilters((prev) => ({
-                  ...prev,
-                  reportingMode: mode,
-                  oac: mode !== 'manual',
-                }))}
+                onClick={() => setFilters((prev) => {
+                  if (prev.reportingMode === 'oac') oacContractorsRef.current = prev.contractors
+                  return {
+                    ...prev,
+                    reportingMode: mode,
+                    oac: mode !== 'manual',
+                    contractors: mode === 'justine'
+                      ? []
+                      : mode === 'oac'
+                        ? oacContractorsRef.current
+                        : prev.contractors,
+                  }
+                })}
               >
                 {label}
               </button>
@@ -2142,7 +2151,10 @@ export default function App() {
             icon={<Filter size={14} />}
             options={report.filterOptions.contractors}
             selected={filters.contractors}
-            onChange={(contractors) => setFilters((prev) => ({ ...prev, contractors }))}
+            onChange={(contractors) => setFilters((prev) => {
+              if (prev.reportingMode === 'oac') oacContractorsRef.current = contractors
+              return { ...prev, contractors }
+            })}
           />
           <FilterMenu
             label="Subtype"
