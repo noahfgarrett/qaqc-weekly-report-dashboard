@@ -1380,7 +1380,7 @@ select:disabled {
   gap: 10px;
 }
 
-.slide-header span {
+.slide-header > div:first-child > span {
   align-items: center;
   background: var(--accent-soft);
   border-radius: 9px;
@@ -1403,6 +1403,85 @@ select:disabled {
   font-size: 10.5px;
   font-style: normal;
   font-weight: 650;
+}
+
+.issue-detail-header-tools,
+.issue-row-legend,
+.issue-row-legend span,
+.issue-page-controls {
+  align-items: center;
+  display: flex;
+}
+
+.issue-detail-header-tools {
+  flex: 0 0 auto;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.issue-row-legend {
+  gap: 10px;
+}
+
+.issue-row-legend span {
+  color: var(--muted);
+  font-size: 9.5px;
+  font-weight: 650;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.issue-row-legend i {
+  border: 1px solid #cbd5df;
+  border-radius: 4px;
+  box-shadow: 0 1px 2px rgba(30, 41, 59, 0.08);
+  display: block;
+  flex: 0 0 auto;
+  height: 12px;
+  width: 18px;
+}
+
+.issue-row-legend i.reporting-week {
+  background: var(--white);
+}
+
+.issue-row-legend i.recent-open {
+  background: #edf3f7;
+  border-color: #9aafbf;
+}
+
+.issue-page-controls {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  gap: 3px;
+  padding: 2px;
+}
+
+.issue-page-controls button {
+  align-items: center;
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--ink-2);
+  display: flex;
+  height: 24px;
+  justify-content: center;
+  padding: 0;
+  width: 24px;
+}
+
+.issue-page-controls button:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.issue-page-controls strong {
+  color: var(--muted);
+  font-size: 9.5px;
+  font-variant-numeric: tabular-nums;
+  min-width: 30px;
+  text-align: center;
 }
 
 .report-pills {
@@ -2361,6 +2440,116 @@ select:disabled {
 
 .issue-table tbody tr.open-discussion-row td:first-child {
   box-shadow: inset 3px 0 #6f879a;
+}
+
+/* Keep the live issue view fully visible for clean screen captures. */
+.issue-detail-slide:not([data-export-slide]) {
+  margin-inline: auto;
+  max-width: min(1320px, calc((100dvh - 300px) * 16 / 9));
+}
+
+.issue-detail-slide:not([data-export-slide]) .detail-metrics {
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.issue-detail-slide:not([data-export-slide]) .metric-chip {
+  border-radius: 10px;
+  padding: 8px 11px;
+}
+
+.issue-detail-slide:not([data-export-slide]) .metric-chip strong {
+  font-size: clamp(15px, 1.25vw, 21px);
+}
+
+.issue-detail-slide:not([data-export-slide]) .metric-chip span {
+  font-size: clamp(8px, 0.66vw, 10px);
+  margin-top: 3px;
+}
+
+.issue-detail-slide:not([data-export-slide]) .issue-table-wrap {
+  border-radius: 11px;
+  margin-top: 8px;
+  overflow: hidden;
+}
+
+.issue-detail-slide:not([data-export-slide]) .issue-table {
+  font-size: clamp(7.5px, 0.62vw, 10px);
+  table-layout: fixed;
+}
+
+.issue-detail-slide:not([data-export-slide]) .issue-table th,
+.issue-detail-slide:not([data-export-slide]) .issue-table td {
+  padding: 4px 7px;
+}
+
+.issue-detail-slide:not([data-export-slide]) .issue-table th {
+  font-size: clamp(7px, 0.57vw, 9px);
+}
+
+.issue-detail-slide:not([data-export-slide]) .status-pill {
+  font-size: 8px;
+  padding: 2px 5px;
+}
+
+.app:has(.issue-detail-slide:not([data-export-slide])) {
+  padding-bottom: 10px;
+}
+
+@media (max-height: 850px) {
+  .issue-detail-slide:not([data-export-slide]) .slide-header {
+    padding-bottom: 5px;
+  }
+
+  .issue-detail-slide:not([data-export-slide]) .slide-header > div:first-child > span {
+    border-radius: 7px;
+    height: 28px;
+    width: 28px;
+  }
+
+  .issue-detail-slide:not([data-export-slide]) .slide-header h2 {
+    font-size: 14px;
+  }
+
+  .issue-detail-slide:not([data-export-slide]) .detail-metrics {
+    margin-top: 7px;
+  }
+
+  .issue-detail-slide:not([data-export-slide]) .metric-chip {
+    padding: 6px 9px;
+  }
+
+  .issue-detail-slide:not([data-export-slide]) .metric-chip strong {
+    font-size: 15px;
+  }
+
+  .issue-detail-slide:not([data-export-slide]) .metric-chip span {
+    font-size: 7.5px;
+    line-height: 1.15;
+  }
+
+  .issue-detail-slide:not([data-export-slide]) .issue-table-wrap {
+    margin-top: 6px;
+  }
+
+  .issue-detail-slide:not([data-export-slide]) .issue-table {
+    font-size: 7px;
+    line-height: 1.1;
+  }
+
+  .issue-detail-slide:not([data-export-slide]) .issue-table th,
+  .issue-detail-slide:not([data-export-slide]) .issue-table td {
+    padding: 2px 5px;
+  }
+
+  .issue-detail-slide:not([data-export-slide]) .issue-table th {
+    font-size: 6.5px;
+  }
+
+  .issue-detail-slide:not([data-export-slide]) .status-pill {
+    font-size: 6.5px;
+    padding: 1px 4px;
+  }
 }
 
 .issue-table tbody tr.open-discussion-row:hover td {

@@ -704,7 +704,6 @@ export function buildReportDeck(report: ReportModel): pptxgen {
 
   const exportIssueRows = selectIssueDetailExportRows(report.issueTable)
   const pages = issuePages(exportIssueRows)
-  const discussionCount = exportIssueRows.filter((row) => row.group === 'Open for Discussion').length
   pages.forEach((rows, pageIndex) => {
     const slide = pptx.addSlide()
     addHeader(slide, `BIM Issues Detail${pages.length > 1 ? ` (${pageIndex + 1} of ${pages.length})` : ''}`, report)
@@ -715,10 +714,10 @@ export function buildReportDeck(report: ReportModel): pptxgen {
     addKpiCard(slide, 3.47, SAFE_TOP + 0.82, 2.7, `Issues Closed During ${periodName}`, compactNumber(report.issueTable.filter((row) => row.group === 'Closed in Report Week').length), '', C.mint)
     addKpiCard(slide, 6.39, SAFE_TOP + 0.82, 2.7, `Opened + Closed Within ${periodName}`, compactNumber(report.issueTable.filter((row) => row.group === 'Opened + Closed in Report Week').length), '', C.cyan)
     addKpiCard(slide, 9.31, SAFE_TOP + 0.82, 2.7, 'Issues Closed During Current Week', compactNumber(report.issueTable.filter((row) => row.group === 'Closed This Week').length), '', C.amber)
-    if (discussionCount > 0) {
-      slide.addShape('rect', { x: 10.52, y: SAFE_TOP + 1.68, w: 0.12, h: 0.08, fill: { color: 'EDF3F7' }, line: { color: '6F879A', width: 0.7 } })
-      slide.addText(`${discussionCount} additional open for discussion`, { x: 10.7, y: SAFE_TOP + 1.665, w: 2.08, h: 0.1, fontSize: 5.6, bold: true, color: '6F879A', align: 'right', margin: 0, fit: 'shrink' })
-    }
+    slide.addShape('roundRect', { x: 9.23, y: SAFE_TOP + 1.665, w: 0.16, h: 0.1, rectRadius: 0.02, fill: { color: C.white }, line: { color: 'CBD5DF', width: 0.7 } })
+    slide.addText('Reporting Week', { x: 9.45, y: SAFE_TOP + 1.665, w: 0.9, h: 0.1, fontSize: 5.5, bold: true, color: C.muted, margin: 0, fit: 'shrink' })
+    slide.addShape('roundRect', { x: 10.5, y: SAFE_TOP + 1.665, w: 0.16, h: 0.1, rectRadius: 0.02, fill: { color: 'EDF3F7' }, line: { color: '9AAFBE', width: 0.7 } })
+    slide.addText('Most Recent Open Issues', { x: 10.72, y: SAFE_TOP + 1.665, w: 1.64, h: 0.1, fontSize: 5.5, bold: true, color: '6F879A', margin: 0, fit: 'shrink' })
     addIssueTable(slide, rows)
     addFooter(slide, report)
   })

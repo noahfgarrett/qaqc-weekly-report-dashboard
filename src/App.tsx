@@ -6,6 +6,8 @@ import {
   CalendarClock,
   CheckCircle2,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   ClipboardCheck,
   Download,
   FileSpreadsheet,
@@ -947,6 +949,8 @@ function SlideShell({
   exportable,
   meta,
   hideHeader,
+  className,
+  headerExtra,
 }: {
   children: React.ReactNode
   title: string
@@ -954,10 +958,12 @@ function SlideShell({
   exportable?: boolean
   meta?: string
   hideHeader?: boolean
+  className?: string
+  headerExtra?: React.ReactNode
 }) {
   return (
     <section
-      className={cx('slide-frame', hideHeader && 'headerless')}
+      className={cx('slide-frame', hideHeader && 'headerless', className)}
       aria-label={title}
       {...(exportable ? { 'data-export-slide': true } : {})}
     >
@@ -970,12 +976,61 @@ function SlideShell({
               <span>{icon}</span>
               <h2>{title}</h2>
             </div>
-            {meta && <em className="slide-meta">{meta}</em>}
+            {headerExtra ?? (meta && <em className="slide-meta">{meta}</em>)}
           </header>
         )}
         {children}
       </div>
     </section>
+  )
+}
+
+function IssueDetailHeader({
+  pageIndex,
+  pageCount,
+  onPreviousPage,
+  onNextPage,
+}: {
+  pageIndex: number
+  pageCount: number
+  onPreviousPage?: () => void
+  onNextPage?: () => void
+}) {
+  const interactive = Boolean(onPreviousPage && onNextPage)
+  return (
+    <div className="issue-detail-header-tools">
+      {pageCount > 1 && (
+        <div className="issue-page-controls" aria-label={`Issue detail page ${pageIndex + 1} of ${pageCount}`}>
+          {interactive && (
+            <button
+              aria-label="Previous issue page"
+              disabled={pageIndex === 0}
+              onClick={onPreviousPage}
+              title="Previous issue page"
+              type="button"
+            >
+              <ChevronLeft size={14} />
+            </button>
+          )}
+          <strong>{pageIndex + 1} / {pageCount}</strong>
+          {interactive && (
+            <button
+              aria-label="Next issue page"
+              disabled={pageIndex >= pageCount - 1}
+              onClick={onNextPage}
+              title="Next issue page"
+              type="button"
+            >
+              <ChevronRight size={14} />
+            </button>
+          )}
+        </div>
+      )}
+      <div className="issue-row-legend" aria-label="Issue row legend">
+        <span><i className="reporting-week" />Reporting Week</span>
+        <span><i className="recent-open" />Most Recent Open Issues</span>
+      </div>
+    </div>
   )
 }
 
@@ -1017,6 +1072,8 @@ function IssueTableSlide({
   summaryRows,
   pageIndex = 0,
   pageCount = 1,
+  onPreviousPage,
+  onNextPage,
 }: {
   report: ReturnType<typeof buildReportModel>
   exportable?: boolean
@@ -1024,6 +1081,8 @@ function IssueTableSlide({
   summaryRows?: IssueDetailRow[]
   pageIndex?: number
   pageCount?: number
+  onPreviousPage?: () => void
+  onNextPage?: () => void
 }) {
   const allRows = summaryRows ?? report.issueTable
   const groupCounts = allRows.reduce<Record<string, number>>((acc, row) => {
@@ -1031,11 +1090,6 @@ function IssueTableSlide({
     return acc
   }, {})
   const visibleRows = rows ?? report.issueTable
-  const discussionCount = groupCounts['Open for Discussion'] ?? 0
-  const reportIssueCount = allRows.length - discussionCount
-  const issueMeta = discussionCount > 0
-    ? `${reportIssueCount} report | ${discussionCount} additional open`
-    : `${reportIssueCount} issues`
   const detailCards: Array<{ group: IssueDetailRow['group']; label: string }> = [
     report.activeFilters.oac
       ? {
@@ -1058,7 +1112,15 @@ function IssueTableSlide({
       title="BIM Issues Detail"
       icon={<Table2 size={18} />}
       exportable={exportable}
-      meta={pageCount > 1 ? `Page ${pageIndex + 1} of ${pageCount} | ${issueMeta}` : issueMeta}
+      className="issue-detail-slide"
+      headerExtra={(
+        <IssueDetailHeader
+          pageIndex={pageIndex}
+          pageCount={pageCount}
+          onPreviousPage={onPreviousPage}
+          onNextPage={onNextPage}
+        />
+      )}
     >
       <div className="detail-metrics">
         {detailCards.map(({ group, label }) => (
@@ -1704,6 +1766,7 @@ export default function App() {
   const [filters, setFilters] = useState<ReportFilters>(() => mergeFilters(loadFilters()))
   const [workspaceTab, setWorkspaceTab] = useState<'report' | 'manual'>('report')
   const [activeSlide, setActiveSlide] = useState<'overview' | 'issues' | 'field'>('overview')
+  const [issuePageIndex, setIssuePageIndex] = useState(0)
   const [imports, setImports] = useState<Partial<Record<SheetRole, ImportedSheetFile>>>({})
   const [importing, setImporting] = useState(false)
   const [exporting, setExporting] = useState(false)
@@ -1732,6 +1795,10 @@ export default function App() {
     () => chunkRows(issueExportRows, ISSUE_ROWS_PER_EXPORT_SLIDE),
     [issueExportRows],
   )
+
+  useEffect(() => {
+    setIssuePageIndex(0)
+  }, [issueExportRows])
 
   useEffect(() => {
     saveFilters(filters)
@@ -1856,7 +1923,17 @@ export default function App() {
   const slide = activeSlide === 'overview'
     ? <OverviewSlide report={report} />
     : activeSlide === 'issues'
-      ? <IssueTableSlide report={report} />
+      ? (
+          <IssueTableSlide
+            report={report}
+            rows={issueExportPages[issuePageIndex] ?? []}
+            summaryRows={issueExportRows}
+            pageIndex={issuePageIndex}
+            pageCount={issueExportPages.length}
+            onPreviousPage={() => setIssuePageIndex((current) => Math.max(0, current - 1))}
+            onNextPage={() => setIssuePageIndex((current) => Math.min(issueExportPages.length - 1, current + 1))}
+          />
+        )
       : <FieldSlide report={report} />
 
   return (

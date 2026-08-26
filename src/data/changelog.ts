@@ -7,6 +7,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.1.3',
+    date: '2026-08-26T12:58:10Z',
+    type: 'feature',
+    notes: [
+      'BIM Issues Detail now uses fixed 14-row in-app pages so the entire report canvas fits on screen for clean snips without table scrolling',
+      'Compact previous and next controls make additional Issue Detail pages easy to review while keeping every row fully visible',
+      'Replaced report-count text with a clear Reporting Week and Most Recent Open Issues row-color legend across the app and exports',
+    ],
+  },
+  {
     version: '1.1.2',
     date: '2026-08-26T12:36:31Z',
     type: 'feature',
