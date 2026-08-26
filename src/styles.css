@@ -2354,6 +2354,19 @@ select:disabled {
   background: var(--panel);
 }
 
+.issue-table tbody tr.open-discussion-row td {
+  background: #edf3f7;
+  border-bottom-color: #d8e3ea;
+}
+
+.issue-table tbody tr.open-discussion-row td:first-child {
+  box-shadow: inset 3px 0 #6f879a;
+}
+
+.issue-table tbody tr.open-discussion-row:hover td {
+  background: #e4edf3;
+}
+
 .status-pill {
   border-radius: 999px;
   display: inline-flex;

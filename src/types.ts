@@ -90,7 +90,7 @@ export interface IssueDetailRow {
   createdOn: string
   workWeekClosed: string
   dueDate: string
-  group: 'Open Carryover' | 'Opened in Report Week' | 'Closed in Report Week' | 'Opened + Closed in Report Week' | 'Closed This Week'
+  group: 'Open Carryover' | 'Opened in Report Week' | 'Closed in Report Week' | 'Opened + Closed in Report Week' | 'Closed This Week' | 'Open for Discussion'
 }
 
 export interface ElectricalPoint {

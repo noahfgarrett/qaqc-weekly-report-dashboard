@@ -131,8 +131,9 @@ const expectedDetails = new Map([
   ['3010', ['Closed in Report Week', 'Complete', 'Completion alias', "WW27'2026", "WW32'2026"]],
   ['3011', ['Closed in Report Week', 'Closed', 'Closure priority', "WW27'2026", "WW32'2026"]],
   ['3012', ['Opened in Report Week', 'Open', 'RFI', "WW32'2026", 'Open']],
+  ['3005', ['Open for Discussion', 'Open', 'Field', "WW27'2026", 'Open']],
 ])
-if (report.issueTable.map((row) => row.id).join(',') !== '3012,3011,3010,3006,3004,3003,3002,3001') {
+if (report.issueTable.map((row) => row.id).join(',') !== '3012,3011,3010,3006,3004,3003,3002,3001,3005') {
   throw new Error('ACC metadata rows were not included, excluded, or sorted correctly.')
 }
 report.issueTable.forEach((row) => {

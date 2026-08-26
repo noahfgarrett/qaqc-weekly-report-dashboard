@@ -26,7 +26,7 @@ import {
   X,
   Zap,
 } from 'lucide-react'
-import { buildReportModel, mergeFilters } from '@/calculations/report'
+import { buildReportModel, mergeFilters, selectIssueDetailExportRows } from '@/calculations/report'
 import { buildSampleBundle } from '@/data/sampleData'
 import { CHANGELOG, type ChangelogEntry } from '@/data/changelog'
 import { exportReportDeck } from '@/export/pptx'
@@ -1014,20 +1014,28 @@ function IssueTableSlide({
   report,
   exportable,
   rows,
+  summaryRows,
   pageIndex = 0,
   pageCount = 1,
 }: {
   report: ReturnType<typeof buildReportModel>
   exportable?: boolean
   rows?: IssueDetailRow[]
+  summaryRows?: IssueDetailRow[]
   pageIndex?: number
   pageCount?: number
 }) {
-  const groupCounts = report.issueTable.reduce<Record<string, number>>((acc, row) => {
+  const allRows = summaryRows ?? report.issueTable
+  const groupCounts = allRows.reduce<Record<string, number>>((acc, row) => {
     acc[row.group] = (acc[row.group] ?? 0) + 1
     return acc
   }, {})
   const visibleRows = rows ?? report.issueTable
+  const discussionCount = groupCounts['Open for Discussion'] ?? 0
+  const reportIssueCount = allRows.length - discussionCount
+  const issueMeta = discussionCount > 0
+    ? `${reportIssueCount} report | ${discussionCount} additional open`
+    : `${reportIssueCount} issues`
   const detailCards: Array<{ group: IssueDetailRow['group']; label: string }> = [
     report.activeFilters.oac
       ? {
@@ -1050,7 +1058,7 @@ function IssueTableSlide({
       title="BIM Issues Detail"
       icon={<Table2 size={18} />}
       exportable={exportable}
-      meta={pageCount > 1 ? `Page ${pageIndex + 1} of ${pageCount} | ${report.issueTable.length} issues` : `${report.issueTable.length} issues`}
+      meta={pageCount > 1 ? `Page ${pageIndex + 1} of ${pageCount} | ${issueMeta}` : issueMeta}
     >
       <div className="detail-metrics">
         {detailCards.map(({ group, label }) => (
@@ -1071,7 +1079,11 @@ function IssueTableSlide({
           </thead>
           <tbody>
             {visibleRows.map((row, index) => (
-              <tr key={`${row.id}-${row.workWeekClosed}-${index}`}>
+              <tr
+                className={cx(row.group === 'Open for Discussion' && 'open-discussion-row')}
+                key={`${row.id}-${row.workWeekClosed}-${index}`}
+                title={row.group === 'Open for Discussion' ? 'Open for discussion' : undefined}
+              >
                 <td>{row.id}</td>
                 <td>{row.subtype}</td>
                 <td>
@@ -1712,9 +1724,13 @@ export default function App() {
   const showSheetPanel = !hasReport || sheetPanelOpen
 
   const report = useMemo(() => buildReportModel(bundle, filters, new Date()), [bundle, filters])
-  const issueExportPages = useMemo(
-    () => chunkRows(report.issueTable, ISSUE_ROWS_PER_EXPORT_SLIDE),
+  const issueExportRows = useMemo(
+    () => selectIssueDetailExportRows(report.issueTable, ISSUE_ROWS_PER_EXPORT_SLIDE),
     [report.issueTable],
+  )
+  const issueExportPages = useMemo(
+    () => chunkRows(issueExportRows, ISSUE_ROWS_PER_EXPORT_SLIDE),
+    [issueExportRows],
   )
 
   useEffect(() => {
@@ -2141,6 +2157,7 @@ export default function App() {
               key={`issues-${index}`}
               report={report}
               rows={rows}
+              summaryRows={issueExportRows}
               pageIndex={index}
               pageCount={issueExportPages.length}
               exportable

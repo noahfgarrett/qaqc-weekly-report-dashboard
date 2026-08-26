@@ -406,29 +406,30 @@ function buildIssueTable(
   periodEnd: WorkWeek,
   activityWindowOnly: boolean,
 ): IssueDetailRow[] {
-  return issues
-    .filter((issue) => {
-      if (issue.statusKind === 'void' || !issue.createdWeek) return false
+  const reportRows: IssueDetailRow[] = []
+  const discussionRows: IssueDetailRow[] = []
+
+  issues.forEach((issue) => {
+      if (issue.statusKind === 'void' || !issue.createdWeek) return
       const openedInReport = isWeekInRange(issue.createdWeek, periodStart, periodEnd)
       const closedInReport = isWeekInRange(issue.closedWeek, periodStart, periodEnd)
       const closedThisWeek = issue.closedWeek?.label === currentWeek.label
-      if (activityWindowOnly) return openedInReport || closedInReport || closedThisWeek
-
       const createdThroughReport = compareWorkWeeks(issue.createdWeek, periodEnd) <= 0
-      if (issue.statusKind !== 'closed') return createdThroughReport
-      if (closedInReport) return true
-      if (openedInReport && closedInReport) return true
-      return !!closedThisWeek && compareWorkWeeks(issue.createdWeek, currentWeek) < 0
-    })
-    .map((issue) => {
-      const openedInReport = isWeekInRange(issue.createdWeek, periodStart, periodEnd)
-      const closedInReport = isWeekInRange(issue.closedWeek, periodStart, periodEnd)
+      const isReportRow = activityWindowOnly
+        ? openedInReport || closedInReport || closedThisWeek
+        : issue.statusKind !== 'closed'
+          ? createdThroughReport
+          : closedInReport || (closedThisWeek && compareWorkWeeks(issue.createdWeek, currentWeek) < 0)
+
+      if (!isReportRow && issue.statusKind !== 'open' && issue.statusKind !== 'pending') return
+
       let group: IssueDetailRow['group'] = 'Open Carryover'
-      if (issue.statusKind === 'closed' && openedInReport && closedInReport) group = 'Opened + Closed in Report Week'
+      if (!isReportRow) group = 'Open for Discussion'
+      else if (issue.statusKind === 'closed' && openedInReport && closedInReport) group = 'Opened + Closed in Report Week'
       else if (issue.statusKind === 'closed' && issue.closedWeek?.label === currentWeek.label) group = 'Closed This Week'
       else if (issue.statusKind === 'closed' && closedInReport) group = 'Closed in Report Week'
       else if (openedInReport) group = 'Opened in Report Week'
-      return {
+      const row: IssueDetailRow = {
         id: issue.id,
         subtype: issue.subtype,
         status: issue.statusKind === 'pending' ? 'Open' : issue.status,
@@ -440,8 +441,24 @@ function buildIssueTable(
         dueDate: formatDate(issue.dueDate),
         group,
       }
+      if (group === 'Open for Discussion') discussionRows.push(row)
+      else reportRows.push(row)
     })
-    .sort((a, b) => b.id.localeCompare(a.id, undefined, { numeric: true, sensitivity: 'base' }))
+
+  const newestFirst = (a: IssueDetailRow, b: IssueDetailRow) =>
+    b.id.localeCompare(a.id, undefined, { numeric: true, sensitivity: 'base' })
+  return selectIssueDetailExportRows([
+    ...reportRows.sort(newestFirst),
+    ...discussionRows.sort(newestFirst),
+  ])
+}
+
+export function selectIssueDetailExportRows(rows: IssueDetailRow[], pageSize = 14): IssueDetailRow[] {
+  const reportRows = rows.filter((row) => row.group !== 'Open for Discussion')
+  const discussionRows = rows.filter((row) => row.group === 'Open for Discussion')
+  const reportPageCount = Math.max(1, Math.ceil(reportRows.length / pageSize))
+  const availableDiscussionRows = reportPageCount * pageSize - reportRows.length
+  return [...reportRows, ...discussionRows.slice(0, availableDiscussionRows)]
 }
 
 function buildElectrical(records: InspectionRecord[], reportWeek: WorkWeek): ElectricalPoint[] {

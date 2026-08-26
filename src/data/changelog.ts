@@ -7,6 +7,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.1.2',
+    date: '2026-08-26T12:36:31Z',
+    type: 'feature',
+    notes: [
+      'BIM Issues Detail now fills unused report-page rows with the newest still-open or Pending issues after the report-week activity rows',
+      'Supplemental open issues use a distinct slate row treatment so they are available for discussion without changing report-week metrics',
+      'HTML, PDF, and PowerPoint use only the highest-ID supplemental issues that fit without creating extra backlog-only pages',
+    ],
+  },
+  {
     version: '1.1.1',
     date: '2026-08-26T12:08:36Z',
     type: 'feature',

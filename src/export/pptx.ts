@@ -1,4 +1,5 @@
 import pptxgen from 'pptxgenjs'
+import { selectIssueDetailExportRows } from '@/calculations/report'
 import type { AgingBucket, ElectricalPoint, IssueDetailRow, KpiMetric, ReportModel, WeeklyIssuePoint, WeldingPoint } from '@/types'
 import { compactNumber, deltaLabel, percent } from '@/utils/format'
 
@@ -610,16 +611,22 @@ function addIssueTable(slide: pptxgen.Slide, rows: IssueDetailRow[]): void {
     slide.addText(label.toUpperCase(), { x: cursor + 0.05, y: y + 0.04, w: width - 0.1, h: 0.12, fontSize: 5.6, bold: true, color: C.muted, charSpacing: 0.4, margin: 0, fit: 'shrink' })
     cursor += width
   })
+  const rowStep = 0.273
+  const rowHeight = 0.255
   rows.forEach((row, rowIndex) => {
-    const yy = y + 0.35 + rowIndex * 0.235
+    const yy = y + 0.35 + rowIndex * rowStep
+    const openForDiscussion = row.group === 'Open for Discussion'
     slide.addShape('rect', {
       x,
       y: yy - 0.03,
       w: 12.25,
-      h: 0.22,
-      fill: { color: rowIndex % 2 === 0 ? 'F8FAFC' : 'FFFFFF' },
-      line: { color: 'F1F5F9', transparency: 50 },
+      h: rowHeight,
+      fill: { color: openForDiscussion ? 'EDF3F7' : rowIndex % 2 === 0 ? 'F8FAFC' : 'FFFFFF' },
+      line: { color: openForDiscussion ? 'D8E3EA' : 'F1F5F9', transparency: 50 },
     })
+    if (openForDiscussion) {
+      slide.addShape('rect', { x, y: yy - 0.03, w: 0.025, h: rowHeight, fill: { color: '6F879A' }, line: { color: '6F879A' } })
+    }
     const values = [row.id, row.subtype, row.status, row.title, row.contractor, row.workWeek, row.createdOn, row.workWeekClosed, row.dueDate]
     cursor = x
     columns.forEach(([, width], index) => {
@@ -633,7 +640,7 @@ function addIssueTable(slide: pptxgen.Slide, rows: IssueDetailRow[]): void {
             : C.teal
       slide.addText(values[index], {
         x: cursor + 0.05,
-        y: yy + 0.025,
+        y: yy + 0.04,
         w: width - 0.1,
         h: 0.1,
         fontSize: 5.7,
@@ -664,7 +671,7 @@ function downloadPresentationBlob(blob: Blob, fileName: string): void {
   window.setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 
-export async function exportReportDeck(report: ReportModel): Promise<void> {
+export function buildReportDeck(report: ReportModel): pptxgen {
   const pptx = new pptxgen()
   pptx.layout = 'LAYOUT_WIDE'
   pptx.author = 'QA/QC Weekly Report Dashboard'
@@ -695,7 +702,9 @@ export async function exportReportDeck(report: ReportModel): Promise<void> {
   addAging(slide1, report.aging, 8.12, SAFE_TOP + 3.9, 4.66, 1.88)
   addFooter(slide1, report)
 
-  const pages = issuePages(report.issueTable)
+  const exportIssueRows = selectIssueDetailExportRows(report.issueTable)
+  const pages = issuePages(exportIssueRows)
+  const discussionCount = exportIssueRows.filter((row) => row.group === 'Open for Discussion').length
   pages.forEach((rows, pageIndex) => {
     const slide = pptx.addSlide()
     addHeader(slide, `BIM Issues Detail${pages.length > 1 ? ` (${pageIndex + 1} of ${pages.length})` : ''}`, report)
@@ -706,6 +715,10 @@ export async function exportReportDeck(report: ReportModel): Promise<void> {
     addKpiCard(slide, 3.47, SAFE_TOP + 0.82, 2.7, `Issues Closed During ${periodName}`, compactNumber(report.issueTable.filter((row) => row.group === 'Closed in Report Week').length), '', C.mint)
     addKpiCard(slide, 6.39, SAFE_TOP + 0.82, 2.7, `Opened + Closed Within ${periodName}`, compactNumber(report.issueTable.filter((row) => row.group === 'Opened + Closed in Report Week').length), '', C.cyan)
     addKpiCard(slide, 9.31, SAFE_TOP + 0.82, 2.7, 'Issues Closed During Current Week', compactNumber(report.issueTable.filter((row) => row.group === 'Closed This Week').length), '', C.amber)
+    if (discussionCount > 0) {
+      slide.addShape('rect', { x: 10.52, y: SAFE_TOP + 1.68, w: 0.12, h: 0.08, fill: { color: 'EDF3F7' }, line: { color: '6F879A', width: 0.7 } })
+      slide.addText(`${discussionCount} additional open for discussion`, { x: 10.7, y: SAFE_TOP + 1.665, w: 2.08, h: 0.1, fontSize: 5.6, bold: true, color: '6F879A', align: 'right', margin: 0, fit: 'shrink' })
+    }
     addIssueTable(slide, rows)
     addFooter(slide, report)
   })
@@ -733,6 +746,11 @@ export async function exportReportDeck(report: ReportModel): Promise<void> {
   addWelding(fieldSlide, report.welding, report.reportWeek.label, 6.82, SAFE_TOP + 2.08, 5.95, 3.74)
   addFooter(fieldSlide, report)
 
+  return pptx
+}
+
+export async function exportReportDeck(report: ReportModel): Promise<void> {
+  const pptx = buildReportDeck(report)
   const output = await pptx.write({ outputType: 'blob', compression: true })
   const blob = output instanceof Blob
     ? output

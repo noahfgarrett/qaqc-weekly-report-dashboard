@@ -109,8 +109,11 @@ if (report.summary.electricalFinals !== 2 || report.summary.electricalIssuesFoun
 if (report.summary.weldsChecked !== 3 || report.summary.weldsSigned !== 2 || Math.abs(report.summary.reportWeekSignoffRate - 66.6667) > 0.01) {
   throw new Error('Welding summary cards did not aggregate both Justine weeks.')
 }
-if (report.issueTable.map((row) => row.id).join(',') !== '105,104,103,102') {
-  throw new Error('BIM Issues Detail did not use the Justine two-week activity window.')
+if (report.issueTable.map((row) => row.id).join(',') !== '105,104,103,102,100') {
+  throw new Error('BIM Issues Detail did not keep the Justine activity window ahead of supplemental open issues.')
+}
+if (report.issueTable.find((row) => row.id === '100')?.group !== 'Open for Discussion') {
+  throw new Error('An older open issue was not appended for discussion in Justine mode.')
 }
 if (report.issueTable.find((row) => row.id === '104')?.status !== 'Open') {
   throw new Error('Pending did not remain an open issue in Justine mode.')

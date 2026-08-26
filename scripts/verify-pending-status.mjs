@@ -10,7 +10,7 @@ const entryPath = resolve(temporaryDirectory, 'pending-status-check.ts')
 const outputDirectory = resolve(temporaryDirectory, 'dist')
 
 const entrySource = `
-import { buildReportModel, mergeFilters } from ${JSON.stringify(resolve(root, 'src/calculations/report.ts'))}
+import { buildReportModel, mergeFilters, selectIssueDetailExportRows } from ${JSON.stringify(resolve(root, 'src/calculations/report.ts'))}
 
 const emptySheet = (name) => ({ id: name, name, rows: [] })
 const bundle = {
@@ -78,8 +78,8 @@ if (strictDetailReport.reportWeek.label !== "WW31'2026") {
   throw new Error('The strict issue-detail regression is not using the expected reporting week.')
 }
 const strictIds = strictDetailReport.issueTable.map((row) => row.id)
-if (strictIds.join(',') !== '1023,1022,1021,1020,1019') {
-  throw new Error('BIM Issues Detail contains rows outside the four report activity cards.')
+if (strictIds.join(',') !== '1023,1022,1021,1020,1019,1018,999') {
+  throw new Error('BIM Issues Detail did not keep report activity first and append supplemental open issues.')
 }
 const expectedGroups = new Map([
   ['1019', 'Opened in Report Week'],
@@ -87,6 +87,8 @@ const expectedGroups = new Map([
   ['1021', 'Opened + Closed in Report Week'],
   ['1022', 'Closed This Week'],
   ['1023', 'Opened in Report Week'],
+  ['1018', 'Open for Discussion'],
+  ['999', 'Open for Discussion'],
 ])
 strictDetailReport.issueTable.forEach((row) => {
   if (row.group !== expectedGroups.get(row.id)) {
@@ -101,6 +103,14 @@ if (strictDetailReport.issueTable.find((row) => row.id === '1019')?.subtype !== 
 }
 if (strictDetailReport.issueTable.some((row) => row.id === '2000' || row.id === '2001')) {
   throw new Error('Legacy and fallback ACC ownership filters did not exclude outside issues.')
+}
+const exportFixture = [
+  ...Array.from({ length: 5 }, (_, index) => ({ ...strictDetailReport.issueTable[0], id: 'R-' + index, group: 'Opened in Report Week' })),
+  ...Array.from({ length: 20 }, (_, index) => ({ ...strictDetailReport.issueTable.at(-1), id: 'D-' + index, group: 'Open for Discussion' })),
+]
+const exportRows = selectIssueDetailExportRows(exportFixture, 14)
+if (exportRows.length !== 14 || exportRows.filter((row) => row.group === 'Open for Discussion').length !== 9) {
+  throw new Error('Supplemental open issues did not stop after filling the unused export-page rows.')
 }
 const strictMetric = (id) => strictDetailReport.kpis.find((item) => item.id === id)?.rawValue
 if (strictMetric('total-opened') !== 7 || strictMetric('total-closed') !== 2 || strictMetric('remaining-open') !== 5) {
@@ -123,7 +133,7 @@ try {
     },
   })
   await import(`${pathToFileURL(resolve(outputDirectory, 'pending-status-check.mjs')).href}?t=${Date.now()}`)
-  console.log('Pending counts as open and BIM Issues Detail is limited to its four report activity cards.')
+  console.log('Pending counts as open and supplemental open issues follow the report activity rows.')
 } finally {
   await rm(temporaryDirectory, { recursive: true, force: true })
 }
