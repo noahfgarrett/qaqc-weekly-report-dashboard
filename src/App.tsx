@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
-  Activity,
   AlertCircle,
   Archive,
   Bell,
@@ -52,7 +51,6 @@ import type {
   ImportedSheetFile,
   IssueDetailRow,
   KpiMetric,
-  MonthlyIssuePoint,
   ReportFilters,
   SheetBundle,
   SheetRecord,
@@ -400,6 +398,17 @@ function KpiZone({ report }: { report: ReturnType<typeof buildReportModel> }) {
   const byId = new Map(report.kpis.map((metric) => [metric.id, metric]))
   return (
     <div className="kpi-groups">
+      <section className="kpi-group this-week">
+        <div className="kpi-group-head">
+          <span>{report.periodLabel}</span>
+        </div>
+        <div className="kpi-group-body">
+          {KPI_GROUPS.week.map((id) => {
+            const metric = byId.get(id)
+            return metric ? <KpiTile key={id} metric={metric} hideDelta /> : null
+          })}
+        </div>
+      </section>
       <section className="kpi-group primary">
         <div className="kpi-group-head">
           <span>Project to date</span>
@@ -409,17 +418,6 @@ function KpiZone({ report }: { report: ReturnType<typeof buildReportModel> }) {
           {KPI_GROUPS.primary.map((id) => {
             const metric = byId.get(id)
             return metric ? <KpiTile key={id} metric={metric} /> : null
-          })}
-        </div>
-      </section>
-      <section className="kpi-group this-week">
-        <div className="kpi-group-head">
-          <span>{report.periodLabel}</span>
-        </div>
-        <div className="kpi-group-body">
-          {KPI_GROUPS.week.map((id) => {
-            const metric = byId.get(id)
-            return metric ? <KpiTile key={id} metric={metric} hideDelta /> : null
           })}
         </div>
       </section>
@@ -670,72 +668,65 @@ function RangeChart({ data }: { data: WeeklyIssuePoint[] }) {
   )
 }
 
-function MonthlyChart({ data }: { data: MonthlyIssuePoint[] }) {
+function OpenAgingChart({ data }: { data: AgingBucket[] }) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
-  const visible = data.slice(-10)
-  const { max, ticks } = niceScale(Math.max(1, ...visible.flatMap((point) => [point.opened, point.closed])))
+  const { max, ticks } = niceScale(Math.max(1, ...data.map((bucket) => bucket.count)), 4)
   const width = 700
   const height = 150
-  const pad = { l: 44, r: 18, t: 20, b: 30 }
+  const pad = { l: 48, r: 18, t: 22, b: 38 }
   const chartW = width - pad.l - pad.r
   const chartH = height - pad.t - pad.b
-  const step = chartW / Math.max(1, visible.length - 1)
+  const group = chartW / Math.max(1, data.length)
+  const barWidth = Math.min(72, group * 0.56)
   const toY = (value: number) => pad.t + chartH - (value / max) * chartH
-  const pointsFor = (key: 'opened' | 'closed') => visible.map((point, index) => ({
-    x: pad.l + index * step,
-    y: toY(point[key]),
-  }))
-  const openedPoints = pointsFor('opened')
-  const closedPoints = pointsFor('closed')
-  const hovered = hoveredIndex === null ? null : visible[hoveredIndex]
+  const hovered = hoveredIndex === null ? null : data[hoveredIndex]
   return (
-    <div className="chart-shell mini-chart-shell">
-      <div className="chart-legend compact-legend">
-        <span className="legend-opened">Opened</span>
-        <span className="legend-closed">Closed</span>
-        <span className="legend-gap">Open Gap</span>
-      </div>
-      <svg className="mini-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Cumulative Opened vs Closed">
-        <defs>
-          <linearGradient id="monthly-gap" x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0%" stopColor="#2e5aac" stopOpacity="0.12" />
-            <stop offset="100%" stopColor="#2e5aac" stopOpacity="0.02" />
-          </linearGradient>
-        </defs>
+    <div className="chart-shell mini-chart-shell open-aging-shell">
+      <svg className="mini-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Open Issue Aging by Weeks">
         {ticks.map((tick) => (
           <g key={tick}>
             <line x1={pad.l} x2={width - pad.r} y1={toY(tick)} y2={toY(tick)} className="grid-line" />
             <text className="tick-label" x={pad.l - 8} y={toY(tick) + 4} textAnchor="end">{chartValue(tick)}</text>
           </g>
         ))}
-        {visible.map((point, index) => (
-          <g key={point.month} onMouseEnter={() => setHoveredIndex(index)} onMouseLeave={() => setHoveredIndex(null)}>
-            <rect className="chart-hit-area" x={pad.l + index * step - step / 2} y={pad.t} width={step} height={chartH} />
-            <text x={pad.l + index * step} y={height - 12} textAnchor="middle">{point.month}</text>
-          </g>
-        ))}
-        <path d={`${smoothPath(openedPoints)} ${[...closedPoints].reverse().map((point) => `L ${point.x} ${point.y}`).join(' ')} Z`} className="monthly-gap-area" />
-        <path d={smoothPath(openedPoints)} className="opened-line" fill="none" />
-        <path d={smoothPath(closedPoints)} className="closed-line" fill="none" />
-        {openedPoints.map((point, index) => (
-          <g key={`opened-${visible[index].month}`}>
-            <circle cx={point.x} cy={point.y} r={index === hoveredIndex ? 4 : 2.8} className="opened-dot" />
-            <text className="series-data-label opened-label" x={point.x} y={Math.max(12, point.y - 9)} textAnchor="middle">{visible[index].opened}</text>
-          </g>
-        ))}
-        {closedPoints.map((point, index) => (
-          <g key={`closed-${visible[index].month}`}>
-            <circle cx={point.x} cy={point.y} r={index === hoveredIndex ? 4 : 2.8} className="closed-dot" />
-            <text className="series-data-label closed-label" x={point.x} y={Math.min(height - pad.b - 4, point.y + 15)} textAnchor="middle">{visible[index].closed}</text>
-          </g>
-        ))}
+        {data.map((bucket, index) => {
+          const x = pad.l + index * group + (group - barWidth) / 2
+          const barHeight = (bucket.count / max) * chartH
+          const y = pad.t + chartH - barHeight
+          const labelInside = barHeight >= 24
+          return (
+            <g key={bucket.label} onMouseEnter={() => setHoveredIndex(index)} onMouseLeave={() => setHoveredIndex(null)}>
+              <rect className="chart-hit-area" x={pad.l + index * group} y={pad.t} width={group} height={chartH} />
+              <rect
+                className={cx('bar', 'open-aging', index === hoveredIndex && 'active')}
+                style={{ fill: bucket.color }}
+                x={x}
+                y={y}
+                width={barWidth}
+                height={Math.max(bucket.count > 0 ? 2 : 0, barHeight)}
+                rx="5"
+              />
+              <text
+                className={cx('open-aging-value', labelInside && 'inside')}
+                x={x + barWidth / 2}
+                y={labelInside ? y + 17 : Math.max(14, y - 7)}
+                textAnchor="middle"
+              >
+                {bucket.count}
+              </text>
+              <text className="open-aging-bucket" x={x + barWidth / 2} y={height - 20} textAnchor="middle">{bucket.label}</text>
+            </g>
+          )
+        })}
+        <text className="axis-title open-aging-y-title" x="13" y={pad.t + chartH / 2} textAnchor="middle" transform={`rotate(-90 13 ${pad.t + chartH / 2})`}>Open issues</text>
+        <text className="axis-title open-aging-x-title" x={pad.l + chartW / 2} y={height - 4} textAnchor="middle">Weeks</text>
       </svg>
       {hovered && (
         <ChartTooltip
           compact
-          title={hovered.month}
-          entries={[`Opened ${hovered.opened}`, `Closed ${hovered.closed}`, `Gap ${hovered.gap}`]}
-          xPercent={visible.length > 1 ? ((hoveredIndex ?? 0) / (visible.length - 1)) * 100 : 50}
+          title={`${hovered.label} weeks`}
+          entries={[`Open issues ${hovered.count}`]}
+          xPercent={((hoveredIndex ?? 0) + 0.5) / data.length * 100}
         />
       )}
     </div>
@@ -1002,15 +993,15 @@ function OverviewSlide({ report, exportable }: { report: ReturnType<typeof build
         </article>
         <article className="panel chart-panel">
           <div className="panel-title">
-            <Activity size={16} />
-            <h3>Cumulative Opened vs Closed</h3>
+            <History size={16} />
+            <h3>Open Issue Aging</h3>
           </div>
-          <MonthlyChart data={report.monthlyTrend} />
+          <OpenAgingChart data={report.openAging} />
         </article>
         <article className="panel chart-panel">
           <div className="panel-title">
             <CalendarClock size={16} />
-            <h3>Issue Aging</h3>
+            <h3>Overall Issue Aging (Opened &amp; Closed)</h3>
           </div>
           <AgingChart data={report.aging} />
         </article>

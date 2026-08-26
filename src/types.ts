@@ -74,13 +74,6 @@ export interface WeeklyIssuePoint {
   remainingOpen: number
 }
 
-export interface MonthlyIssuePoint {
-  month: string
-  opened: number
-  closed: number
-  gap: number
-}
-
 export interface AgingBucket {
   label: string
   count: number
@@ -130,7 +123,7 @@ export interface ReportModel {
   activeFilters: ReportFilters
   kpis: KpiMetric[]
   issueTrend: WeeklyIssuePoint[]
-  monthlyTrend: MonthlyIssuePoint[]
+  openAging: AgingBucket[]
   aging: AgingBucket[]
   issueTable: IssueDetailRow[]
   electrical: ElectricalPoint[]

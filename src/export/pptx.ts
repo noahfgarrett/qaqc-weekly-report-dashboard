@@ -1,5 +1,5 @@
 import pptxgen from 'pptxgenjs'
-import type { AgingBucket, ElectricalPoint, IssueDetailRow, KpiMetric, MonthlyIssuePoint, ReportModel, WeeklyIssuePoint, WeldingPoint } from '@/types'
+import type { AgingBucket, ElectricalPoint, IssueDetailRow, KpiMetric, ReportModel, WeeklyIssuePoint, WeldingPoint } from '@/types'
 import { compactNumber, deltaLabel, percent } from '@/utils/format'
 
 const SLIDE_W = 13.333
@@ -395,38 +395,52 @@ function addIssueTrend(slide: pptxgen.Slide, data: WeeklyIssuePoint[], x: number
   })
 }
 
-function addMonthly(slide: pptxgen.Slide, data: MonthlyIssuePoint[], x: number, y: number, w: number, h: number): void {
-  addPanel(slide, x, y, w, h, 'Cumulative Opened vs Closed')
+function addOpenAging(slide: pptxgen.Slide, data: AgingBucket[], x: number, y: number, w: number, h: number): void {
+  addPanel(slide, x, y, w, h, 'Open Issue Aging')
   const chartX = x + 0.35
-  const chartY = y + 0.54
+  const chartY = y + 0.48
   const chartW = w - 0.62
-  const chartH = h - 0.85
-  const visible = data.slice(-10)
-  const maxY = maxOf(visible.flatMap((d) => [d.opened, d.closed]))
-  const step = chartW / Math.max(1, visible.length - 1)
-  addLine(slide, chartX, chartY + chartH, chartX + chartW, chartY + chartH, 'D8DEE7', 0.7)
-  visible.forEach((point, index) => {
-    if (index === 0) return
-    const prev = visible[index - 1]
-    const x1 = chartX + (index - 1) * step
-    const x2 = chartX + index * step
-    addLine(slide, x1, chartY + chartH - (prev.opened / maxY) * chartH, x2, chartY + chartH - (point.opened / maxY) * chartH, C.cyan, 1.5)
-    addLine(slide, x1, chartY + chartH - (prev.closed / maxY) * chartH, x2, chartY + chartH - (point.closed / maxY) * chartH, C.mint, 1.5)
+  const chartH = h - 0.88
+  const maxY = maxOf(data.map((bucket) => bucket.count))
+  const groupW = chartW / Math.max(1, data.length)
+  const barW = Math.min(0.68, groupW * 0.55)
+  ;[0, 0.5, 1].forEach((ratio) => {
+    const yy = chartY + chartH - ratio * chartH
+    addLine(slide, chartX, yy, chartX + chartW, yy, C.hairline, 0.6)
+    slide.addText(String(Math.round(maxY * ratio)), { x: x + 0.08, y: yy - 0.05, w: 0.22, h: 0.1, fontSize: 5.2, color: C.muted, align: 'right', margin: 0 })
   })
-  visible.forEach((point, index) => {
-    const px = chartX + index * step
-    const openedY = chartY + chartH - (point.opened / maxY) * chartH
-    const closedY = chartY + chartH - (point.closed / maxY) * chartH
-    slide.addShape('ellipse', { x: px - 0.025, y: openedY - 0.025, w: 0.05, h: 0.05, fill: { color: C.cyan }, line: { color: C.white, width: 0.5 } })
-    slide.addShape('ellipse', { x: px - 0.025, y: closedY - 0.025, w: 0.05, h: 0.05, fill: { color: C.mint }, line: { color: C.white, width: 0.5 } })
-    slide.addText(String(point.opened), { x: px - 0.18, y: Math.max(chartY, openedY - 0.15), w: 0.36, h: 0.11, fontSize: 5.8, bold: true, color: C.cyan, align: 'center', margin: 0 })
-    slide.addText(String(point.closed), { x: px - 0.18, y: Math.min(chartY + chartH - 0.07, closedY + 0.05), w: 0.36, h: 0.11, fontSize: 5.8, bold: true, color: C.mint, align: 'center', margin: 0 })
-    slide.addText(point.month, { x: px - 0.26, y: chartY + chartH + 0.06, w: 0.52, h: 0.11, fontSize: 5.8, color: C.muted, align: 'center', margin: 0 })
+  data.forEach((bucket, index) => {
+    const barH = (bucket.count / maxY) * chartH
+    const bx = chartX + index * groupW + (groupW - barW) / 2
+    const by = chartY + chartH - barH
+    slide.addShape('roundRect', {
+      x: bx,
+      y: by,
+      w: barW,
+      h: Math.max(0.01, barH),
+      rectRadius: 0.05,
+      fill: { color: bucket.color.replace('#', '') },
+      line: { color: bucket.color.replace('#', '') },
+    })
+    const inside = barH >= 0.28
+    slide.addText(String(bucket.count), {
+      x: bx - 0.06,
+      y: inside ? by + 0.06 : Math.max(chartY, by - 0.14),
+      w: barW + 0.12,
+      h: 0.11,
+      fontSize: 6.2,
+      bold: true,
+      color: inside ? C.white : C.text,
+      align: 'center',
+      margin: 0,
+    })
+    slide.addText(bucket.label, { x: bx - 0.06, y: chartY + chartH + 0.04, w: barW + 0.12, h: 0.11, fontSize: 6, bold: true, color: C.muted, align: 'center', margin: 0 })
   })
+  slide.addText('Weeks', { x: chartX + chartW / 2 - 0.35, y: y + h - 0.18, w: 0.7, h: 0.1, fontSize: 5.4, bold: true, color: C.muted, align: 'center', margin: 0 })
 }
 
 function addAging(slide: pptxgen.Slide, data: AgingBucket[], x: number, y: number, w: number, h: number): void {
-  addPanel(slide, x, y, w, h, 'Issue Aging')
+  addPanel(slide, x, y, w, h, 'Overall Issue Aging (Opened & Closed)')
   const maxY = maxOf(data.map((d) => d.count))
   data.forEach((bucket, index) => {
     const yy = y + 0.55 + index * 0.42
@@ -674,11 +688,11 @@ export async function exportReportDeck(report: ReportModel): Promise<void> {
     .filter((metric): metric is KpiMetric => Boolean(metric))
   const kpiGroupGap = 0.18
   const kpiGroupW = (12.23 - kpiGroupGap) / 2
-  addKpiGroup(slide1, 0.55, kpiY, kpiGroupW, 1.62, 'PROJECT TO DATE', `Through ${report.periodEndWeek.label}`, projectMetrics, C.surface)
-  addKpiGroup(slide1, 0.55 + kpiGroupW + kpiGroupGap, kpiY, kpiGroupW, 1.62, report.periodLabel, '', weekMetrics, C.panel, false)
+  addKpiGroup(slide1, 0.55, kpiY, kpiGroupW, 1.62, report.periodLabel, '', weekMetrics, C.surface, false)
+  addKpiGroup(slide1, 0.55 + kpiGroupW + kpiGroupGap, kpiY, kpiGroupW, 1.62, 'PROJECT TO DATE', `Through ${report.periodEndWeek.label}`, projectMetrics, C.panel)
   addIssueTrend(slide1, report.issueTrend, 0.55, SAFE_TOP + 1.86, 12.23, 1.82)
-  addMonthly(slide1, report.monthlyTrend, 0.55, SAFE_TOP + 3.9, 7.85, 1.88)
-  addAging(slide1, report.aging, 8.62, SAFE_TOP + 3.9, 4.16, 1.88)
+  addOpenAging(slide1, report.openAging, 0.55, SAFE_TOP + 3.9, 7.35, 1.88)
+  addAging(slide1, report.aging, 8.12, SAFE_TOP + 3.9, 4.66, 1.88)
   addFooter(slide1, report)
 
   const pages = issuePages(report.issueTable)

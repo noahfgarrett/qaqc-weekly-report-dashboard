@@ -1,7 +1,7 @@
 {
   "name": "qaqc-weekly-report-dashboard",
   "private": true,
-  "version": "1.1.0",
+  "version": "1.1.1",
   "type": "module",
   "repository": {
     "type": "git",
@@ -14,6 +14,7 @@
     "typecheck": "tsc -b",
     "test:acc-metadata": "node scripts/verify-acc-metadata.mjs",
     "test:manual-issues": "node scripts/verify-manual-issues-update.mjs",
+    "test:open-aging": "node scripts/verify-open-aging.mjs",
     "test:pending-status": "node scripts/verify-pending-status.mjs",
     "test:justine-mode": "node scripts/verify-justine-mode.mjs"
   },

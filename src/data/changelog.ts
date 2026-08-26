@@ -7,6 +7,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.1.1',
+    date: '2026-08-26T12:08:36Z',
+    type: 'feature',
+    notes: [
+      'Replaced Cumulative Opened vs Closed with an Open Issue Aging chart grouped into 0-1, 1-2, 2-3, 3-4, and 4+ week buckets',
+      'Renamed the existing aging panel to Overall Issue Aging (Opened & Closed) for clearer scope',
+      'Swapped the reporting-period and Project to Date KPI groups across the dashboard, PDF, and PowerPoint layouts',
+      'The reporting-period KPI group now uses the lighter surface treatment, with Project to Date using the contrasting gray treatment',
+      'Rebalanced the aging-chart row and introduced one slate-blue scale that darkens as issue age increases',
+    ],
+  },
+  {
     version: '1.1.0',
     date: '2026-08-20T11:48:01Z',
     type: 'major',

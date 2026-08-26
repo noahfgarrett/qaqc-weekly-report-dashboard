@@ -1454,11 +1454,11 @@ select:disabled {
 }
 
 .kpi-group.primary {
-  background: #f8faff;
+  background: var(--panel);
 }
 
 .kpi-group.this-week {
-  background: var(--panel);
+  background: #f8faff;
 }
 
 .kpi-group-head {
@@ -1663,7 +1663,7 @@ select:disabled {
   display: grid;
   flex: 1 1 auto;
   gap: 10px;
-  grid-template-columns: minmax(0, 1.75fr) minmax(250px, 0.75fr);
+  grid-template-columns: minmax(0, 1.55fr) minmax(280px, 0.85fr);
   grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
   margin-top: 8px;
   min-height: 0;
@@ -1798,20 +1798,6 @@ select:disabled {
   stroke-width: 2;
 }
 
-.opened-line {
-  stroke: var(--c-opened);
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 2;
-}
-
-.closed-line {
-  stroke: var(--c-closed);
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 2;
-}
-
 .electrical-line {
   stroke: var(--c-series);
   stroke-linecap: round;
@@ -1819,20 +1805,42 @@ select:disabled {
   stroke-width: 2;
 }
 
-.monthly-gap-area {
-  fill: url(#monthly-gap);
+.bar.open-aging {
+  opacity: 0.9;
+  transition: opacity 140ms ease;
 }
 
-.opened-dot {
-  fill: var(--c-opened);
-  stroke: var(--white);
-  stroke-width: 2;
+.bar.open-aging.active {
+  opacity: 1;
 }
 
-.closed-dot {
-  fill: var(--c-closed);
+.open-aging-value {
+  fill: var(--ink-2);
+  font-size: 10px !important;
+  font-variant-numeric: tabular-nums;
+  font-weight: 750 !important;
+  paint-order: stroke;
   stroke: var(--white);
-  stroke-width: 2;
+  stroke-width: 3px;
+}
+
+.open-aging-value.inside {
+  fill: var(--white);
+  paint-order: normal;
+  stroke: none;
+}
+
+.open-aging-bucket {
+  fill: var(--ink-2) !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+}
+
+.open-aging-x-title,
+.open-aging-y-title {
+  fill: var(--faint) !important;
+  font-size: 8.5px !important;
+  font-weight: 700 !important;
 }
 
 .electrical-dot {
@@ -1970,8 +1978,7 @@ select:disabled {
   stroke: none;
 }
 
-.line-value,
-.series-data-label {
+.line-value {
   font-size: 8.5px;
   font-variant-numeric: tabular-nums;
   font-weight: 750;
@@ -1992,14 +1999,6 @@ select:disabled {
   paint-order: stroke;
   stroke: var(--white);
   stroke-width: 4px;
-}
-
-.opened-label {
-  fill: var(--c-opened);
-}
-
-.closed-label {
-  fill: var(--c-closed);
 }
 
 .electrical-label,
@@ -2045,11 +2044,6 @@ select:disabled {
 .legend-remaining::before,
 .legend-amber::before {
   background: var(--c-remaining);
-}
-
-.legend-gap::before {
-  background: var(--c-series);
-  opacity: 0.35;
 }
 
 .legend-series::before,
@@ -2109,15 +2103,6 @@ select:disabled {
 
 .field-chart-shell .chart-tooltip {
   bottom: 52px;
-}
-
-.compact-legend {
-  gap: 10px;
-  margin: 2px 0 0;
-}
-
-.compact-legend span {
-  font-size: 10px;
 }
 
 .field-chart-shell {

@@ -14,7 +14,6 @@ import type {
   FilterOptions,
   IssueDetailRow,
   KpiMetric,
-  MonthlyIssuePoint,
   ReportFilters,
   ReportModel,
   SheetBundle,
@@ -29,9 +28,6 @@ import {
   daysBetween,
   enumerateWorkWeeks,
   formatDate,
-  isOnOrBefore,
-  monthKey,
-  monthLabel,
   parseDate,
   parseWorkWeek,
   previousWorkWeek,
@@ -362,38 +358,11 @@ function buildWeeklyTrend(issues: IssueRecord[], reportWeek: WorkWeek): WeeklyIs
   }))
 }
 
-function buildMonthlyTrend(issues: IssueRecord[], cutoff: Date): MonthlyIssuePoint[] {
-  const months = uniqueSorted(
-    issues
-      .flatMap((issue) => [issue.createdOn, issue.updatedOn])
-      .filter((date): date is Date => !!date && date <= cutoff)
-      .map(monthKey),
-  )
-
-  return months.map((key) => {
-    const [year, month] = key.split('-').map(Number)
-    const monthEnd = new Date(year, month, 0, 12)
-    const end = monthEnd > cutoff ? cutoff : monthEnd
-    const opened = issues.filter((issue) =>
-      issue.statusKind !== 'void' && isOnOrBefore(issue.createdOn, end),
-    ).length
-    const closed = issues.filter((issue) =>
-      issue.statusKind === 'closed' && isOnOrBefore(issue.updatedOn, end),
-    ).length
-    return {
-      month: monthLabel(key),
-      opened,
-      closed,
-      gap: opened - closed,
-    }
-  })
-}
-
 function buildAging(issues: IssueRecord[], today: Date): AgingBucket[] {
   const buckets: AgingBucket[] = [
-    { label: '0-14 Days', count: 0, color: '#0D6331' },
-    { label: '14-28 Days', count: 0, color: '#C2870B' },
-    { label: '28+ Days', count: 0, color: '#D03B3B' },
+    { label: '0-14 Days', count: 0, color: '#B8C4D0' },
+    { label: '14-28 Days', count: 0, color: '#778C9F' },
+    { label: '28+ Days', count: 0, color: '#3F5367' },
   ]
   issues
     .filter((issue) => issue.statusKind !== 'void' && issue.createdOn)
@@ -404,6 +373,29 @@ function buildAging(issues: IssueRecord[], today: Date): AgingBucket[] {
       else if (age < 28) buckets[1].count += 1
       else buckets[2].count += 1
     })
+  return buckets
+}
+
+function buildOpenAging(issues: IssueRecord[], today: Date): AgingBucket[] {
+  const buckets: AgingBucket[] = [
+    { label: '0-1', count: 0, color: '#B8C4D0' },
+    { label: '1-2', count: 0, color: '#9EAFBF' },
+    { label: '2-3', count: 0, color: '#778C9F' },
+    { label: '3-4', count: 0, color: '#5D7185' },
+    { label: '4+', count: 0, color: '#3F5367' },
+  ]
+
+  issues
+    .filter((issue) => (issue.statusKind === 'open' || issue.statusKind === 'pending') && issue.createdOn)
+    .forEach((issue) => {
+      const age = daysBetween(issue.createdOn as Date, today)
+      if (age < 7) buckets[0].count += 1
+      else if (age < 14) buckets[1].count += 1
+      else if (age < 21) buckets[2].count += 1
+      else if (age < 28) buckets[3].count += 1
+      else buckets[4].count += 1
+    })
+
   return buckets
 }
 
@@ -660,7 +652,7 @@ export function buildReportModel(
     activeFilters: filters,
     kpis,
     issueTrend: buildWeeklyTrend(issues, reportWeek),
-    monthlyTrend: buildMonthlyTrend(issues, cutoffDate),
+    openAging: buildOpenAging(issues, now),
     aging: buildAging(issues, now),
     issueTable: buildIssueTable(
       allIssues.filter((issue) => passesIssueFilters(issue, { ...filters, oac: false, workWeeks: [] }, reportWeek)),
