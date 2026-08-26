@@ -112,6 +112,21 @@ const exportRows = selectIssueDetailExportRows(exportFixture, 14)
 if (exportRows.length !== 14 || exportRows.filter((row) => row.group === 'Open for Discussion').length !== 9) {
   throw new Error('Supplemental open issues did not stop after filling the unused export-page rows.')
 }
+const fourOpenSlots = selectIssueDetailExportRows([
+  ...exportFixture.slice(0, 5),
+  ...exportFixture.slice(0, 5).map((row, index) => ({ ...row, id: 'R-extra-' + index })),
+  ...exportFixture.slice(5),
+], 14)
+if (fourOpenSlots.filter((row) => row.group === 'Open for Discussion').length !== 4) {
+  throw new Error('Ten reporting rows must add only the four newest open issues that fit.')
+}
+const noOpenSlots = selectIssueDetailExportRows([
+  ...Array.from({ length: 14 }, (_, index) => ({ ...exportFixture[0], id: 'R-full-' + index })),
+  ...exportFixture.slice(5),
+], 14)
+if (noOpenSlots.some((row) => row.group === 'Open for Discussion')) {
+  throw new Error('A full reporting page must not add any supplemental open issues.')
+}
 const strictMetric = (id) => strictDetailReport.kpis.find((item) => item.id === id)?.rawValue
 if (strictMetric('total-opened') !== 7 || strictMetric('total-closed') !== 2 || strictMetric('remaining-open') !== 5) {
   throw new Error('Legacy ownership and date priority did not propagate through dashboard metrics.')

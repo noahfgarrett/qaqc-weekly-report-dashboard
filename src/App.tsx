@@ -93,6 +93,13 @@ const PREVIEW_BUNDLE = buildSampleBundle()
 const ISSUE_ROWS_PER_EXPORT_SLIDE = 14
 const EXPORT_COOLDOWN_MS = 3000
 
+function issueRowsForViewport(): number {
+  if (typeof window === 'undefined') return 12
+  const slideHeight = Math.min(742.5, Math.max(430, window.innerHeight - 300))
+  const usableTableHeight = slideHeight * 0.826 - 179
+  return Math.max(4, Math.min(12, Math.floor(usableTableHeight / 34.5)))
+}
+
 function waitForExportCooldown(): Promise<void> {
   return new Promise((resolve) => window.setTimeout(resolve, EXPORT_COOLDOWN_MS))
 }
@@ -1767,6 +1774,7 @@ export default function App() {
   const [workspaceTab, setWorkspaceTab] = useState<'report' | 'manual'>('report')
   const [activeSlide, setActiveSlide] = useState<'overview' | 'issues' | 'field'>('overview')
   const [issuePageIndex, setIssuePageIndex] = useState(0)
+  const [issuePageSize, setIssuePageSize] = useState(issueRowsForViewport)
   const [imports, setImports] = useState<Partial<Record<SheetRole, ImportedSheetFile>>>({})
   const [importing, setImporting] = useState(false)
   const [exporting, setExporting] = useState(false)
@@ -1795,10 +1803,24 @@ export default function App() {
     () => chunkRows(issueExportRows, ISSUE_ROWS_PER_EXPORT_SLIDE),
     [issueExportRows],
   )
+  const issueAppRows = useMemo(
+    () => selectIssueDetailExportRows(report.issueTable, issuePageSize),
+    [report.issueTable, issuePageSize],
+  )
+  const issueAppPages = useMemo(
+    () => chunkRows(issueAppRows, issuePageSize),
+    [issueAppRows, issuePageSize],
+  )
 
   useEffect(() => {
     setIssuePageIndex(0)
-  }, [issueExportRows])
+  }, [issueAppRows])
+
+  useEffect(() => {
+    const updateIssuePageSize = (): void => setIssuePageSize(issueRowsForViewport())
+    window.addEventListener('resize', updateIssuePageSize)
+    return () => window.removeEventListener('resize', updateIssuePageSize)
+  }, [])
 
   useEffect(() => {
     saveFilters(filters)
@@ -1926,12 +1948,12 @@ export default function App() {
       ? (
           <IssueTableSlide
             report={report}
-            rows={issueExportPages[issuePageIndex] ?? []}
-            summaryRows={issueExportRows}
+            rows={issueAppPages[issuePageIndex] ?? []}
+            summaryRows={issueAppRows}
             pageIndex={issuePageIndex}
-            pageCount={issueExportPages.length}
+            pageCount={issueAppPages.length}
             onPreviousPage={() => setIssuePageIndex((current) => Math.max(0, current - 1))}
-            onNextPage={() => setIssuePageIndex((current) => Math.min(issueExportPages.length - 1, current + 1))}
+            onNextPage={() => setIssuePageIndex((current) => Math.min(issueAppPages.length - 1, current + 1))}
           />
         )
       : <FieldSlide report={report} />

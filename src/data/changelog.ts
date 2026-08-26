@@ -7,6 +7,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.1.4',
+    date: '2026-08-26T13:11:00Z',
+    type: 'fix',
+    notes: [
+      'Restored the original Issue Detail slide, card, title, and table sizing so report content remains comfortably readable and unclipped',
+      'The live canvas now fits the screen by adjusting complete-row capacity while preserving the original readable typography and card sizing',
+      'The newest open issues fill only genuinely unused rows after reporting-week issues, with no typography compression to accommodate additional backlog',
+      'A full report page receives no supplemental open issues; a page with four empty rows receives only the four most recent open issues',
+    ],
+  },
+  {
     version: '1.1.3',
     date: '2026-08-26T12:58:10Z',
     type: 'feature',
