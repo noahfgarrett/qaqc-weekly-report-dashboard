@@ -2449,18 +2449,8 @@ select:disabled {
   box-shadow: inset 3px 0 #6f879a;
 }
 
-/* Fit the live canvas by reducing row capacity, never by shrinking its content. */
-.issue-detail-slide:not([data-export-slide]) {
-  aspect-ratio: auto;
-  height: clamp(430px, calc(100dvh - 300px), 742.5px);
-}
-
 .issue-detail-slide:not([data-export-slide]) .issue-table-wrap {
   overflow: hidden;
-}
-
-.app:has(.issue-detail-slide:not([data-export-slide])) {
-  padding-bottom: 10px;
 }
 
 .issue-table tbody tr.open-discussion-row:hover td {
