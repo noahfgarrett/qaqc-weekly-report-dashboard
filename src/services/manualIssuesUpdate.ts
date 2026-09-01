@@ -3,7 +3,7 @@ import { parseDate } from '@/utils/workWeeks'
 
 export type ManualIssueWorkbookKind = 'current' | 'acc'
 export type ManualIssueField = 'id' | 'contractor' | 'discipline'
-export type EnrichedIssueField = 'contractor' | 'discipline' | 'createdBy' | 'createdOn' | 'closedOn'
+export type EnrichedIssueField = 'contractor' | 'discipline' | 'createdBy' | 'createdOn' | 'closedOn' | 'dueDate'
 
 interface IssueFieldDefinition {
   key: ManualIssueField
@@ -39,6 +39,7 @@ export interface ManualIssueEnrichment {
   createdBy: string
   createdOn: Date | null
   closedOn: Date | null
+  dueDate: Date | null
   filledFields: EnrichedIssueField[]
 }
 
@@ -55,6 +56,7 @@ export interface ManualIssueAnalysis {
   enrichedCreators: number
   enrichedCreatedDates: number
   enrichedClosedDates: number
+  filledDueDates: number
   changes: ManualIssueEnrichment[]
 }
 
@@ -252,6 +254,7 @@ export function reconcileIssueRows(
   let enrichedCreators = 0
   let enrichedCreatedDates = 0
   let enrichedClosedDates = 0
+  let filledDueDates = 0
 
   acc.rows.forEach((row) => {
     const id = displayValue(rowValue(acc, row, 'id'))
@@ -294,6 +297,8 @@ export function reconcileIssueRows(
           'Updated',
         ]))
       : null
+    const currentDueDate = parseDate(rowValueByAliases(currentRow, ['Due Date', 'Due date', 'Due']))
+    const accDueDate = rowValueByAliases(row, ['Due Date', 'Due date', 'Due'])
     const accLegacyCreatedBy = displayValue(rowValueByAliases(row, ['BIM360_Created By', 'BIM360 Created By']))
     const accLegacyCreatedOn = rowValueByAliases(row, ['BIM360_Created On', 'BIM360 Created On'])
     const accLegacyClosedOn = rowValueByAliases(row, ['BIM360_Closed On', 'BIM360 Closed On'])
@@ -319,6 +324,10 @@ export function reconcileIssueRows(
       filledFields.push('closedOn')
       enrichedClosedDates += 1
     }
+    if (currentDueDate && isBlank(accDueDate)) {
+      filledFields.push('dueDate')
+      filledDueDates += 1
+    }
 
     if (filledFields.length === 0) {
       unchangedMatchedRows += 1
@@ -333,6 +342,7 @@ export function reconcileIssueRows(
       createdBy: currentCreatedBy,
       createdOn: currentCreatedOn,
       closedOn: currentClosedOn,
+      dueDate: currentDueDate,
       filledFields,
     })
   })
@@ -350,6 +360,7 @@ export function reconcileIssueRows(
     enrichedCreators,
     enrichedCreatedDates,
     enrichedClosedDates,
+    filledDueDates,
     changes,
   }
 }
@@ -372,6 +383,7 @@ const ENRICHMENT_COLUMNS: Record<Exclude<EnrichedIssueField, 'contractor' | 'dis
   createdBy: { header: 'BIM360_Created By', aliases: ['BIM360_Created By', 'BIM360 Created By'] },
   createdOn: { header: 'BIM360_Created On', aliases: ['BIM360_Created On', 'BIM360 Created On'] },
   closedOn: { header: 'BIM360_Closed On', aliases: ['BIM360_Closed On', 'BIM360 Closed On'] },
+  dueDate: { header: 'Due Date', aliases: ['Due Date', 'Due date', 'Due'] },
 }
 
 function ensureEnrichmentColumn(

@@ -7,6 +7,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.2.2',
+    date: '2026-09-01T19:23:55Z',
+    type: 'fix',
+    notes: [
+      'Manual Issues Update now fills a blank ACC Due Date from the matching historical BIM issue',
+      'Existing ACC Due Date values remain authoritative and are never overwritten by enrichment',
+      'Due Date fills now appear in the enrichment preview, summary counts, and downloaded workbook',
+      'The manual-update regression fixture verifies both blank-date fills and preservation of existing ACC dates',
+    ],
+  },
+  {
     version: '1.2.1',
     date: '2026-09-01T19:06:24Z',
     type: 'fix',

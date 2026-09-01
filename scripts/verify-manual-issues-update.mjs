@@ -21,7 +21,7 @@ import {
 const workbookBytes = (rows, includeNotes = false) => {
   const workbook = XLSX.utils.book_new()
   const worksheet = XLSX.utils.aoa_to_sheet(rows)
-  worksheet['!autofilter'] = { ref: 'A1:F' + rows.length }
+  worksheet['!autofilter'] = { ref: 'A1:' + XLSX.utils.encode_col(rows[0].length - 1) + rows.length }
   XLSX.utils.book_append_sheet(workbook, worksheet, 'Issues')
   if (includeNotes) {
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([['Keep this sheet'], ['Untouched']]), 'Notes')
@@ -30,23 +30,23 @@ const workbookBytes = (rows, includeNotes = false) => {
 }
 
 const currentBytes = workbookBytes([
-  ['ID', 'Contractor', 'Discipline', 'Created By', 'Created On', 'Updated On', 'Status', 'Reference Notes'],
-  ['BIM-100', 'Old Trade', 'BIM', 'Samuel Leach LotusWorks', '2026-01-01', '2026-03-01', 'Pending', 'fill both'],
-  ['BIM-101', 'Trade A', 'Electrical', 'Samuel Leach LotusWorks', '2026-01-02', '2026-03-02', 'Open', 'fill discipline only'],
-  ['BIM-102', '', 'Mechanical', 'Samuel Leach LotusWorks', '2026-01-03', '2026-02-01', 'Closed', 'dates only'],
-  ['BIM-103', 'Trade C', '', 'Samuel Leach LotusWorks', '2026-01-04', '2026-03-04', 'Open', 'fill contractor only'],
-  ['BIM-104', 'Trade D', 'Piping', '', '2026-01-05', '2026-03-05', 'Open', 'first duplicate wins'],
-  ['BIM-104', 'Wrong Duplicate', 'Wrong Duplicate', 'Wrong Duplicate', '2025-01-01', '2025-01-02', 'Closed', 'ignored duplicate'],
+  ['ID', 'Contractor', 'Discipline', 'Created By', 'Created On', 'Updated On', 'Status', 'Due Date', 'Reference Notes'],
+  ['BIM-100', 'Old Trade', 'BIM', 'Samuel Leach LotusWorks', '2026-01-01', '2026-03-01', 'Pending', '2026-04-01', 'fill both'],
+  ['BIM-101', 'Trade A', 'Electrical', 'Samuel Leach LotusWorks', '2026-01-02', '2026-03-02', 'Open', '2026-04-02', 'fill discipline only'],
+  ['BIM-102', '', 'Mechanical', 'Samuel Leach LotusWorks', '2026-01-03', '2026-02-01', 'Closed', '', 'dates only'],
+  ['BIM-103', 'Trade C', '', 'Samuel Leach LotusWorks', '2026-01-04', '2026-03-04', 'Open', '', 'fill contractor only'],
+  ['BIM-104', 'Trade D', 'Piping', '', '2026-01-05', '2026-03-05', 'Open', '', 'first duplicate wins'],
+  ['BIM-104', 'Wrong Duplicate', 'Wrong Duplicate', 'Wrong Duplicate', '2025-01-01', '2025-01-02', 'Closed', '2025-04-01', 'ignored duplicate'],
 ])
 const accBytes = workbookBytes([
-  ['Issue ID', 'Responsible Contractor', 'Trade', 'Title', 'Status', 'ACC Metadata'],
-  ['BIM-100', '', '', 'One hundred', 'Pending', 'keep-100'],
-  ['BIM-101', 'ACC Trade', '', 'One hundred one', 'Open', 'keep-101'],
-  ['BIM-102', '', 'ACC Discipline', 'One hundred two', 'Closed', 'keep-102'],
-  ['BIM-103', '', '', 'One hundred three', 'Open', 'keep-103'],
-  ['BIM-104', '   ', '   ', 'One hundred four', 'Open', 'keep-104'],
-  ['BIM-999', '', '', 'Unmatched issue', 'Open', 'keep-999'],
-  ['', '', '', 'Missing ID row', 'Open', 'keep-missing'],
+  ['Issue ID', 'Responsible Contractor', 'Trade', 'Title', 'Status', 'Due date', 'ACC Metadata'],
+  ['BIM-100', '', '', 'One hundred', 'Pending', '', 'keep-100'],
+  ['BIM-101', 'ACC Trade', '', 'One hundred one', 'Open', '2026-04-20', 'keep-101'],
+  ['BIM-102', '', 'ACC Discipline', 'One hundred two', 'Closed', '', 'keep-102'],
+  ['BIM-103', '', '', 'One hundred three', 'Open', '', 'keep-103'],
+  ['BIM-104', '   ', '   ', 'One hundred four', 'Open', '', 'keep-104'],
+  ['BIM-999', '', '', 'Unmatched issue', 'Open', '', 'keep-999'],
+  ['', '', '', 'Missing ID row', 'Open', '', 'keep-missing'],
 ], true)
 
 const currentFile = new File([currentBytes], 'Current_BIM_Issues_Log.xlsx')
@@ -67,6 +67,7 @@ if (analysis.filledContractors !== 3 || analysis.filledDisciplines !== 3) {
 if (analysis.enrichedCreators !== 5 || analysis.enrichedCreatedDates !== 5 || analysis.enrichedClosedDates !== 1) {
   throw new Error('Historical ownership and driving-date counts are incorrect.')
 }
+if (analysis.filledDueDates !== 1) throw new Error('Blank ACC Due Date fill count is incorrect.')
 if (analysis.changes.map((change) => change.id).join(',') !== 'BIM-100,BIM-101,BIM-102,BIM-103,BIM-104') {
   throw new Error('The wrong ACC rows were selected for enrichment.')
 }
@@ -77,7 +78,7 @@ if (enriched.SheetNames.join(',') !== 'Issues,Notes') throw new Error('The ACC w
 if (enriched.Sheets.Notes.A1?.v !== 'Keep this sheet' || enriched.Sheets.Notes.A2?.v !== 'Untouched') {
   throw new Error('A secondary ACC worksheet was modified.')
 }
-if (enriched.Sheets.Issues['!autofilter']?.ref !== 'A1:I8') {
+if (enriched.Sheets.Issues['!autofilter']?.ref !== 'A1:J8') {
   throw new Error('The ACC worksheet filter range was not preserved.')
 }
 
@@ -117,6 +118,12 @@ if (byId.get('BIM-100')?.['BIM360_Closed On'] !== '' || byId.get('BIM-104')?.['B
 if (isoDate(byId.get('BIM-104')?.['BIM360_Created On']) !== '2026-01-05') {
   throw new Error('The first matching historical ID did not control duplicate-date enrichment.')
 }
+if (isoDate(byId.get('BIM-100')?.['Due date']) !== '2026-04-01') {
+  throw new Error('A blank ACC Due Date was not filled from the matching historical issue.')
+}
+if (isoDate(byId.get('BIM-101')?.['Due date']) !== '2026-04-20') {
+  throw new Error('An existing ACC Due Date was incorrectly overwritten by the historical issue.')
+}
 
 rows.forEach((row) => {
   const id = row['Issue ID'] || 'missing'
@@ -147,7 +154,7 @@ try {
     },
   })
   await import(`${pathToFileURL(resolve(outputDirectory, 'manual-issues-check.mjs')).href}?t=${Date.now()}`)
-  console.log('Manual update preserves ACC data while enriching matched IDs with BIM ownership and driving dates.')
+  console.log('Manual update preserves ACC data while enriching ownership, driving dates, and blank Due Date cells.')
 } finally {
   await rm(temporaryDirectory, { recursive: true, force: true })
 }

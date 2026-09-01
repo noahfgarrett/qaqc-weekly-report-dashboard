@@ -1548,6 +1548,7 @@ const ENRICHED_FIELD_LABELS: Record<EnrichedIssueField, string> = {
   createdBy: 'BIM owner',
   createdOn: 'Created date',
   closedOn: 'Closed date',
+  dueDate: 'Due date',
 }
 
 function enrichedFieldList(fields: EnrichedIssueField[]): string {
@@ -1561,6 +1562,9 @@ function drivingDateSummary(change: ManualIssueEnrichment): string {
       : '',
     change.filledFields.includes('closedOn') && change.closedOn
       ? `Closed ${formatDate(change.closedOn)}`
+      : '',
+    change.filledFields.includes('dueDate') && change.dueDate
+      ? `Due ${formatDate(change.dueDate)}`
       : '',
   ].filter(Boolean)
   return dates.join(' · ') || 'No date change'
@@ -1712,10 +1716,11 @@ function ManualIssuesUpdate() {
             </article>
             <article className="new-issues">
               <span>Driving dates</span>
-              <strong>{(analysis.enrichedCreatedDates + analysis.enrichedClosedDates).toLocaleString()}</strong>
+              <strong>{(analysis.enrichedCreatedDates + analysis.enrichedClosedDates + analysis.filledDueDates).toLocaleString()}</strong>
               <small>
                 {analysis.enrichedCreatedDates.toLocaleString()} created ·{' '}
-                {analysis.enrichedClosedDates.toLocaleString()} closed
+                {analysis.enrichedClosedDates.toLocaleString()} closed ·{' '}
+                {analysis.filledDueDates.toLocaleString()} due
               </small>
             </article>
           </div>
@@ -1810,7 +1815,8 @@ function ManualIssuesUpdate() {
                 <small>
                   {analysis.filledContractors.toLocaleString()} Contractor cells ·{' '}
                   {analysis.filledDisciplines.toLocaleString()} Discipline cells ·{' '}
-                  {(analysis.enrichedCreatedDates + analysis.enrichedClosedDates).toLocaleString()} driving dates
+                  {analysis.filledDueDates.toLocaleString()} Due Date cells ·{' '}
+                  {(analysis.enrichedCreatedDates + analysis.enrichedClosedDates).toLocaleString()} historical dates
                 </small>
               </span>
             </div>
