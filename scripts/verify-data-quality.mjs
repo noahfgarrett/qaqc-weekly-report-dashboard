@@ -62,12 +62,12 @@ const bundle = {
     mechanical: {
       id: 'mechanical',
       name: 'Mechanical / Process Inspection Log',
-      rows: [{ __rowNumber: 4, 'Inspection Phase': 'Final', 'Work Week Observed': "WW35'2026", 'General Contractor': '', Discipline: 'Mechanical', Subtype: 'Final' }],
+      rows: [{ __rowNumber: 4, 'Inspection Phase': 'Final', 'Work Week Observed': "WW35'2026", 'General Contractor': '', Discipline: 'Mechanical', Subtype: '' }],
     },
     electrical: {
       id: 'electrical',
       name: 'Electrical Inspection Log',
-      rows: [{ __rowNumber: 5, 'Inspection Phase': '', 'Work Week Observed': "WW35'2026", 'General Contractor': '', Discipline: 'Electrical', Subtype: 'Final', 'Issue?': '' }],
+      rows: [{ __rowNumber: 5, 'Inspection Phase': '', 'Work Week Observed': "WW35'2026", 'General Contractor': '', Discipline: 'Electrical', Subtype: '', 'Issue?': '' }],
     },
     welding: {
       id: 'welding',
@@ -87,9 +87,6 @@ const expected = [
   'electrical:0:contractor',
   'welding:0:weldNumber',
   'welding:0:weldWorkWeek',
-  'welding:0:contractor',
-  'welding:0:discipline',
-  'welding:0:subtype',
 ]
 if (fields.join('|') !== expected.join('|')) {
   throw new Error('Blank-field audit mismatch: ' + fields.join(', '))
@@ -100,25 +97,25 @@ if (audit.findings.some((finding) => finding.role === 'bimIssues' && finding.row
 if (audit.findings.some((finding) => finding.field === 'signature' || finding.field === 'issueCreated')) {
   throw new Error('Intentional blank weld or issue indicators were incorrectly required.')
 }
+if (audit.findings.some((finding) => ['mechanical', 'electrical'].includes(finding.role) && finding.field === 'subtype')) {
+  throw new Error('Inspection Subtype was incorrectly included in the correction review.')
+}
 const contractorFindings = audit.findings.filter((finding) => finding.field === 'contractor')
-if (contractorFindings.length !== 4 || contractorFindings.some((finding) => audit.initialValues[finding.id] !== 'Bechtel')) {
+if (contractorFindings.length !== 3 || contractorFindings.some((finding) => audit.initialValues[finding.id] !== 'Bechtel')) {
   throw new Error('Blank contractors were not consistently suggested as Bechtel.')
+}
+if (audit.findings.some((finding) => finding.role === 'welding' && ['contractor', 'discipline', 'subtype'].includes(finding.field))) {
+  throw new Error('Welding ownership fields were incorrectly included in the correction review.')
 }
 
 const values = { ...audit.initialValues }
-audit.findings.forEach((finding) => {
-  if (finding.field === 'closedOn') values[finding.id] = '2026-08-28'
-  if (finding.field === 'inspectionPhase') values[finding.id] = 'Final'
-  if (finding.field === 'weldNumber') values[finding.id] = 'W-204'
-  if (finding.field === 'weldWorkWeek') values[finding.id] = "WW35'2026"
-})
 const corrected = applyDataQualityEdits(bundle, audit.findings, values)
 if (corrected.sheets.bimIssues.rows[0].Contractor !== 'Bechtel') throw new Error('BIM Contractor correction was not applied.')
-if (corrected.sheets.bimIssues.rows[1]['Closed At'] !== '2026-08-28') throw new Error('Closed At correction missed its source column.')
+if (corrected.sheets.bimIssues.rows[1]['Closed At'] !== '') throw new Error('An unresolved Closed At value should remain blank.')
 if (corrected.sheets.electrical.rows[0]['General Contractor'] !== 'Bechtel') throw new Error('General Contractor correction missed its source column.')
-if (corrected.sheets.electrical.rows[0]['Inspection Phase'] !== 'Final') throw new Error('Inspection Phase correction was not applied.')
-if (corrected.sheets.welding.rows[0].NO !== 'W-204' || corrected.sheets.welding.rows[0]['WELD WORK WEEK'] !== "WW35'2026") {
-  throw new Error('Welding corrections were not applied.')
+if (corrected.sheets.electrical.rows[0]['Inspection Phase'] !== '') throw new Error('An unresolved Inspection Phase should remain blank.')
+if (corrected.sheets.welding.rows[0].NO !== '' || corrected.sheets.welding.rows[0]['WELD WORK WEEK'] !== '') {
+  throw new Error('Unresolved welding values should remain blank.')
 }
 `
 
@@ -138,7 +135,7 @@ try {
     },
   })
   await import(`${pathToFileURL(resolve(outputDirectory, 'data-quality-check.mjs')).href}?t=${Date.now()}`)
-  console.log('Missing report fields are audited, suggested, and applied without flagging intentional blanks.')
+  console.log('Missing fields are reviewed without gating, while unused inspection and welding ownership fields are ignored.')
 } finally {
   await rm(temporaryDirectory, { recursive: true, force: true })
 }

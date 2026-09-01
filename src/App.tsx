@@ -184,18 +184,18 @@ function DataQualityModal({
   })
 
   return (
-    <Modal open={open} title="Complete Missing Report Data" onClose={onCancel} wide dismissible={false}>
+    <Modal open={open} title="Review Missing Report Data" onClose={onCancel} wide dismissible={false}>
       <div className="data-quality-body">
         <div className="data-quality-intro">
           <span><AlertCircle size={20} /></span>
           <div>
             <strong>Review {findings.length} blank {findings.length === 1 ? 'field' : 'fields'} before generating the report</strong>
-            <p>Contractor blanks are suggested as Bechtel. Every value can be changed before it is applied.</p>
+            <p>Contractor blanks are suggested as Bechtel. Add any values you have now, or leave them blank and continue.</p>
           </div>
         </div>
         <div className="data-quality-summary" aria-label="Missing data summary">
           <span><strong>{affectedRows}</strong>Affected rows</span>
-          <span className={cx(missingCount > 0 && 'needs-input')}><strong>{missingCount}</strong>Needs input</span>
+          <span className={cx(missingCount > 0 && 'needs-input')}><strong>{missingCount}</strong>Left blank</span>
           <span className="suggested"><strong>{suggestedCount}</strong>Suggested values</span>
         </div>
         <div className="data-quality-list">
@@ -224,13 +224,13 @@ function DataQualityModal({
         <div className="data-quality-actions">
           <span>
             {missingCount > 0
-              ? `${missingCount} required ${missingCount === 1 ? 'value remains' : 'values remain'}`
-              : <><CheckCircle2 size={14} /> Ready to apply</>}
+              ? `${missingCount} blank ${missingCount === 1 ? 'value will' : 'values will'} be skipped`
+              : <><CheckCircle2 size={14} /> All flagged values completed</>}
           </span>
           <button className="button secondary" type="button" onClick={onCancel}>Cancel import</button>
-          <button className="button primary" type="button" disabled={missingCount > 0} onClick={onApply}>
+          <button className="button primary" type="button" onClick={onApply}>
             <CheckCircle2 size={16} />
-            Apply corrections
+            Continue to report
           </button>
         </div>
       </div>

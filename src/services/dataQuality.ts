@@ -95,7 +95,6 @@ const ROLE_FIELDS: Record<SheetRole, FieldDefinition[]> = {
     },
     CONTRACTOR_FIELD,
     { field: 'discipline', label: 'Discipline', canonicalColumn: 'Discipline', aliases: ['Discipline', 'Trade'] },
-    { field: 'subtype', label: 'Subtype', canonicalColumn: 'Subtype', aliases: ['Subtype', 'Sub Type', 'Inspection Type'] },
   ],
   electrical: [
     {
@@ -112,7 +111,6 @@ const ROLE_FIELDS: Record<SheetRole, FieldDefinition[]> = {
     },
     CONTRACTOR_FIELD,
     { field: 'discipline', label: 'Discipline', canonicalColumn: 'Discipline', aliases: ['Discipline', 'Trade'] },
-    { field: 'subtype', label: 'Subtype', canonicalColumn: 'Subtype', aliases: ['Subtype', 'Sub Type', 'Inspection Type'] },
   ],
   welding: [
     { field: 'weldNumber', label: 'Weld Number', canonicalColumn: 'NO', aliases: ['NO', 'No.', 'Weld No', 'Weld Number', 'Weld #', 'Weld ID'] },
@@ -122,9 +120,6 @@ const ROLE_FIELDS: Record<SheetRole, FieldDefinition[]> = {
       canonicalColumn: 'WELD WORK WEEK',
       aliases: ['WELD WORK WEEK', 'Weld Work Week', 'Weld WW', 'Work Week Welded', 'Work Week'],
     },
-    CONTRACTOR_FIELD,
-    { field: 'discipline', label: 'Discipline', canonicalColumn: 'Discipline', aliases: ['Discipline', 'Trade'], suggestedValue: 'Welding' },
-    { field: 'subtype', label: 'Subtype', canonicalColumn: 'Subtype', aliases: ['Subtype', 'Sub Type', 'Weld Type'], suggestedValue: 'Welding' },
   ],
 }
 
@@ -215,12 +210,14 @@ export function applyDataQualityEdits(
 ): SheetBundle {
   const rowsByRole = new Map<SheetRole, Record<string, unknown>[]>()
   findings.forEach((finding) => {
+    const value = values[finding.id]?.trim()
+    if (!value) return
     let rows = rowsByRole.get(finding.role)
     if (!rows) {
       rows = bundle.sheets[finding.role].rows.map((row) => ({ ...row }))
       rowsByRole.set(finding.role, rows)
     }
-    rows[finding.rowIndex][finding.targetColumn] = values[finding.id]?.trim() ?? ''
+    rows[finding.rowIndex][finding.targetColumn] = value
   })
 
   return {

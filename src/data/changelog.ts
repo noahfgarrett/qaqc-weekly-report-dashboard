@@ -7,6 +7,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.2.1',
+    date: '2026-09-01T19:06:24Z',
+    type: 'fix',
+    notes: [
+      'The missing-data review is now non-blocking, so any subset of corrections can be applied while unresolved blanks are skipped',
+      'Blank Contractor and General Contractor suggestions remain editable and can be accepted independently',
+      'Mechanical and Electrical inspection rows no longer flag Subtype because it is not used by their report calculations',
+      'Welding rows no longer flag Contractor, Discipline, or Subtype because those fields do not drive welding metrics',
+      'Review wording now clearly distinguishes optional blanks from corrections ready to apply',
+    ],
+  },
+  {
     version: '1.2.0',
     date: '2026-09-01T14:31:53Z',
     type: 'feature',
