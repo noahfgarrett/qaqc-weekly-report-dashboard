@@ -1,7 +1,7 @@
 {
   "name": "qaqc-weekly-report-dashboard",
   "private": true,
-  "version": "1.1.6",
+  "version": "1.2.0",
   "type": "module",
   "repository": {
     "type": "git",
@@ -16,7 +16,8 @@
     "test:manual-issues": "node scripts/verify-manual-issues-update.mjs",
     "test:open-aging": "node scripts/verify-open-aging.mjs",
     "test:pending-status": "node scripts/verify-pending-status.mjs",
-    "test:justine-mode": "node scripts/verify-justine-mode.mjs"
+    "test:justine-mode": "node scripts/verify-justine-mode.mjs",
+    "test:data-quality": "node scripts/verify-data-quality.mjs"
   },
   "dependencies": {
     "fflate": "^0.8.3",

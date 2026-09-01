@@ -33,6 +33,12 @@ import { buildSampleBundle } from '@/data/sampleData'
 import { CHANGELOG, type ChangelogEntry } from '@/data/changelog'
 import { exportReportDeck } from '@/export/pptx'
 import { exportSlidesPdf } from '@/export/pdf'
+import {
+  applyDataQualityEdits,
+  auditDataQuality,
+  dataQualityRoleLabel,
+  type DataQualityFinding,
+} from '@/services/dataQuality'
 import { expandImportFiles, filesFromDrop, importSpreadsheet } from '@/services/fileImport'
 import {
   buildUpdatedIssueWorkbook,
@@ -94,6 +100,13 @@ const ISSUE_ROWS_PER_EXPORT_SLIDE = 14
 const ISSUE_ROWS_PER_APP_SLIDE = 12
 const EXPORT_COOLDOWN_MS = 3000
 
+interface DataQualityReview {
+  bundle: SheetBundle
+  imports: Partial<Record<SheetRole, ImportedSheetFile>>
+  findings: DataQualityFinding[]
+  values: Record<string, string>
+}
+
 function waitForExportCooldown(): Promise<void> {
   return new Promise((resolve) => window.setTimeout(resolve, EXPORT_COOLDOWN_MS))
 }
@@ -113,16 +126,18 @@ function Modal({
   children,
   onClose,
   wide,
+  dismissible = true,
 }: {
   open: boolean
   title: string
   children: React.ReactNode
   onClose: () => void
   wide?: boolean
+  dismissible?: boolean
 }) {
   if (!open) return null
   return (
-    <div className="modal-backdrop" role="presentation" onMouseDown={onClose}>
+    <div className="modal-backdrop" role="presentation" onMouseDown={dismissible ? onClose : undefined}>
       <div
         className={cx('modal', wide && 'modal-wide')}
         role="dialog"
@@ -132,13 +147,94 @@ function Modal({
       >
         <div className="modal-header">
           <h2>{title}</h2>
-          <button className="icon-button" type="button" onClick={onClose} aria-label="Close">
-            <X size={18} />
-          </button>
+          {dismissible && (
+            <button className="icon-button" type="button" onClick={onClose} aria-label="Close">
+              <X size={18} />
+            </button>
+          )}
         </div>
         {children}
       </div>
     </div>
+  )
+}
+
+function DataQualityModal({
+  open,
+  findings,
+  values,
+  onChange,
+  onCancel,
+  onApply,
+}: {
+  open: boolean
+  findings: DataQualityFinding[]
+  values: Record<string, string>
+  onChange: (id: string, value: string) => void
+  onCancel: () => void
+  onApply: () => void
+}) {
+  const missingCount = findings.filter((finding) => !values[finding.id]?.trim()).length
+  const suggestedCount = findings.filter((finding) => finding.autoFilled).length
+  const affectedRows = new Set(findings.map((finding) => `${finding.role}:${finding.rowIndex}`)).size
+  const orderedFindings = [...findings].sort((a, b) => {
+    const aMissing = values[a.id]?.trim() ? 1 : 0
+    const bMissing = values[b.id]?.trim() ? 1 : 0
+    return aMissing - bMissing || a.role.localeCompare(b.role) || a.rowNumber - b.rowNumber || a.fieldLabel.localeCompare(b.fieldLabel)
+  })
+
+  return (
+    <Modal open={open} title="Complete Missing Report Data" onClose={onCancel} wide dismissible={false}>
+      <div className="data-quality-body">
+        <div className="data-quality-intro">
+          <span><AlertCircle size={20} /></span>
+          <div>
+            <strong>Review {findings.length} blank {findings.length === 1 ? 'field' : 'fields'} before generating the report</strong>
+            <p>Contractor blanks are suggested as Bechtel. Every value can be changed before it is applied.</p>
+          </div>
+        </div>
+        <div className="data-quality-summary" aria-label="Missing data summary">
+          <span><strong>{affectedRows}</strong>Affected rows</span>
+          <span className={cx(missingCount > 0 && 'needs-input')}><strong>{missingCount}</strong>Needs input</span>
+          <span className="suggested"><strong>{suggestedCount}</strong>Suggested values</span>
+        </div>
+        <div className="data-quality-list">
+          {orderedFindings.map((finding) => {
+            const value = values[finding.id] ?? ''
+            return (
+              <label className={cx('data-quality-row', !value.trim() && 'missing')} key={finding.id}>
+                <span className="data-quality-row-context">
+                  <strong>{dataQualityRoleLabel(finding.role)}</strong>
+                  <small>{finding.recordLabel} · Source row {finding.rowNumber}</small>
+                </span>
+                <span className="data-quality-field-label">
+                  {finding.fieldLabel}
+                  {finding.autoFilled && <em>Suggested</em>}
+                </span>
+                <input
+                  aria-label={`${dataQualityRoleLabel(finding.role)} ${finding.recordLabel} ${finding.fieldLabel}`}
+                  placeholder={`Enter ${finding.fieldLabel}`}
+                  value={value}
+                  onChange={(event) => onChange(finding.id, event.target.value)}
+                />
+              </label>
+            )
+          })}
+        </div>
+        <div className="data-quality-actions">
+          <span>
+            {missingCount > 0
+              ? `${missingCount} required ${missingCount === 1 ? 'value remains' : 'values remain'}`
+              : <><CheckCircle2 size={14} /> Ready to apply</>}
+          </span>
+          <button className="button secondary" type="button" onClick={onCancel}>Cancel import</button>
+          <button className="button primary" type="button" disabled={missingCount > 0} onClick={onApply}>
+            <CheckCircle2 size={16} />
+            Apply corrections
+          </button>
+        </div>
+      </div>
+    </Modal>
   )
 }
 
@@ -1779,6 +1875,7 @@ export default function App() {
   const [updateDefaultTab, setUpdateDefaultTab] = useState<'update' | 'changelog'>('changelog')
   const [updateChecking, setUpdateChecking] = useState(false)
   const [lastUpdateCheck, setLastUpdateCheck] = useState<Date | null>(null)
+  const [dataQualityReview, setDataQualityReview] = useState<DataQualityReview | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const folderInputRef = useRef<HTMLInputElement>(null)
   const oacContractorsRef = useRef<string[]>(filters.reportingMode === 'oac' ? filters.contractors : [])
@@ -1873,6 +1970,32 @@ export default function App() {
     }
   }
 
+  function commitImportedBundle(
+    nextImports: Partial<Record<SheetRole, ImportedSheetFile>>,
+    nextBundle: SheetBundle,
+  ): void {
+    setImports(nextImports)
+    setBundle(nextBundle)
+    setActiveSlide('overview')
+    if (nextBundle.source === 'files') setSheetPanelOpen(false)
+  }
+
+  function applyQualityReview(): void {
+    if (!dataQualityReview) return
+    const correctedBundle = applyDataQualityEdits(
+      dataQualityReview.bundle,
+      dataQualityReview.findings,
+      dataQualityReview.values,
+    )
+    const correctedImports = { ...dataQualityReview.imports }
+    ;(Object.keys(ROLE_CONFIG) as SheetRole[]).forEach((role) => {
+      const imported = correctedImports[role]
+      if (imported) correctedImports[role] = { ...imported, sheet: correctedBundle.sheets[role] }
+    })
+    commitImportedBundle(correctedImports, correctedBundle)
+    setDataQualityReview(null)
+  }
+
   async function handleFiles(files: File[]): Promise<void> {
     if (files.length === 0) return
     setImporting(true)
@@ -1887,10 +2010,21 @@ export default function App() {
         else errors.push(result.reason instanceof Error ? result.reason.message : 'A spreadsheet could not be imported.')
       })
       const nextBundle = bundleForImports(next)
-      setImports(next)
-      setBundle(nextBundle)
-      setActiveSlide('overview')
-      if (nextBundle.source === 'files') setSheetPanelOpen(false)
+      if (nextBundle.source === 'files') {
+        const audit = auditDataQuality(nextBundle)
+        if (audit.findings.length > 0) {
+          setDataQualityReview({
+            bundle: nextBundle,
+            imports: next,
+            findings: audit.findings,
+            values: audit.initialValues,
+          })
+        } else {
+          commitImportedBundle(next, nextBundle)
+        }
+      } else {
+        commitImportedBundle(next, nextBundle)
+      }
       if (errors.length > 0) {
         setError(errors.join(' '))
       }
@@ -1916,6 +2050,7 @@ export default function App() {
   }
 
   function removeImport(role: SheetRole): void {
+    setDataQualityReview(null)
     const next = { ...imports }
     delete next[role]
     setImports(next)
@@ -1924,6 +2059,7 @@ export default function App() {
   }
 
   function clearImports(): void {
+    setDataQualityReview(null)
     setImports({})
     setBundle(EMPTY_BUNDLE)
     setSheetPanelOpen(true)
@@ -2245,6 +2381,17 @@ export default function App() {
         checking={updateChecking}
         lastChecked={lastUpdateCheck}
         onCheck={handleManualUpdateCheck}
+      />
+
+      <DataQualityModal
+        open={Boolean(dataQualityReview)}
+        findings={dataQualityReview?.findings ?? []}
+        values={dataQualityReview?.values ?? {}}
+        onChange={(id, value) => setDataQualityReview((current) => current
+          ? { ...current, values: { ...current.values, [id]: value } }
+          : current)}
+        onCancel={() => setDataQualityReview(null)}
+        onApply={applyQualityReview}
       />
 
       {hasReport && (

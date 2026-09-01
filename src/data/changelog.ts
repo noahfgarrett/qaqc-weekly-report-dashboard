@@ -7,6 +7,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.2.0',
+    date: '2026-09-01T14:31:53Z',
+    type: 'feature',
+    notes: [
+      'Added a pre-report data quality review that flags blank fields used by dashboard calculations, filters, and Issue Detail',
+      'Blank Contractor and General Contractor cells are suggested as Bechtel while remaining fully editable before applying corrections',
+      'The review identifies the source sheet, record, row, and field; unresolved required values must be completed before the report opens',
+      'Intentional blanks such as unsigned welds, empty issue indicators, and closure dates on open issues remain valid and are not flagged',
+      'Corrections are applied to the in-memory imported sheets so the dashboard, PowerPoint, and PDF all use the reviewed values',
+    ],
+  },
+  {
     version: '1.1.6',
     date: '2026-08-26T13:38:00Z',
     type: 'fix',
