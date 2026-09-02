@@ -57,6 +57,18 @@ const bundle = {
           'Due Date': '',
           'Created By': 'Peter Autodesk',
         },
+        {
+          __rowNumber: 10,
+          ID: '102',
+          Status: 'Completed',
+          Type: 'Quality',
+          Title: 'Completed but not closed',
+          Contractor: 'Bechtel',
+          Discipline: 'Mechanical',
+          'Created On': '2026-08-20',
+          'Due Date': '2026-09-10',
+          'Created By': 'Alex LotusWorks',
+        },
       ],
     },
     mechanical: {
@@ -93,6 +105,9 @@ if (fields.join('|') !== expected.join('|')) {
 }
 if (audit.findings.some((finding) => finding.role === 'bimIssues' && finding.rowIndex === 2)) {
   throw new Error('A non-LotusWorks BIM issue was incorrectly included in the correction review.')
+}
+if (audit.findings.some((finding) => finding.role === 'bimIssues' && finding.rowIndex === 3 && finding.field === 'closedOn')) {
+  throw new Error('Completed was incorrectly treated as Closed by the missing-data review.')
 }
 if (audit.findings.some((finding) => finding.field === 'signature' || finding.field === 'issueCreated')) {
   throw new Error('Intentional blank weld or issue indicators were incorrectly required.')

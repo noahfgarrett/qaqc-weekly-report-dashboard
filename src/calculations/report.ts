@@ -105,7 +105,7 @@ function hasColumn(row: Record<string, unknown>, keys: string[]): boolean {
 function normalizeStatus(status: string): IssueStatus {
   const lower = status.trim().toLowerCase()
   if (lower === 'void') return 'void'
-  if (lower === 'closed' || lower === 'complete' || lower === 'completed') return 'closed'
+  if (lower === 'closed') return 'closed'
   if (lower === 'pending') return 'pending'
   return 'open'
 }

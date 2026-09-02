@@ -76,7 +76,7 @@ const ROLE_FIELDS: Record<SheetRole, FieldDefinition[]> = {
       label: 'Closed On',
       canonicalColumn: 'Closed At',
       aliases: ['BIM360_Closed On', 'BIM360 Closed On', 'Closed At', 'Updated On', 'Updated', 'Closed On', 'Date Closed'],
-      when: (row) => ['closed', 'complete', 'completed'].includes(readValue(row, ['Status']).trim().toLowerCase()),
+      when: (row) => readValue(row, ['Status']).trim().toLowerCase() === 'closed',
     },
     { field: 'dueDate', label: 'Due Date', canonicalColumn: 'Due Date', aliases: ['Due Date', 'Due'] },
   ],

@@ -102,7 +102,7 @@ function datesMatch(left: Date | null, rightValue: unknown): boolean {
 
 function statusIsClosed(value: unknown): boolean {
   const status = String(value ?? '').trim().toLowerCase()
-  return status === 'closed' || status === 'complete' || status === 'completed'
+  return status === 'closed'
 }
 
 function extension(fileName: string): string {

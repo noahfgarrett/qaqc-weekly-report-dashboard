@@ -111,10 +111,10 @@ if (report.currentWeek.label !== "WW33'2026" || report.reportWeek.label !== "WW3
 const metric = (id) => report.kpis.find((item) => item.id === id)?.rawValue
 const expectedMetrics = new Map([
   ['total-opened', 9],
-  ['total-closed', 4],
+  ['total-closed', 3],
   ['opened-week', 4],
-  ['closed-week', 4],
-  ['remaining-open', 5],
+  ['closed-week', 3],
+  ['remaining-open', 6],
 ])
 expectedMetrics.forEach((expected, id) => {
   if (metric(id) !== expected) {
@@ -128,12 +128,12 @@ const expectedDetails = new Map([
   ['3003', ['Closed in Report Week', 'Closed', 'Quality', "WW27'2026", "WW32'2026"]],
   ['3004', ['Closed This Week', 'Closed', 'Safety', "WW27'2026", "WW33'2026"]],
   ['3006', ['Opened in Report Week', 'Open', 'Fallback subtype', "WW32'2026", 'Open']],
-  ['3010', ['Closed in Report Week', 'Complete', 'Completion alias', "WW27'2026", "WW32'2026"]],
+  ['3010', ['Open for Discussion', 'Complete', 'Completion alias', "WW27'2026", 'Open']],
   ['3011', ['Closed in Report Week', 'Closed', 'Closure priority', "WW27'2026", "WW32'2026"]],
   ['3012', ['Opened in Report Week', 'Open', 'RFI', "WW32'2026", 'Open']],
   ['3005', ['Open for Discussion', 'Open', 'Field', "WW27'2026", 'Open']],
 ])
-if (report.issueTable.map((row) => row.id).join(',') !== '3012,3011,3010,3006,3004,3003,3002,3001,3005') {
+if (report.issueTable.map((row) => row.id).join(',') !== '3012,3011,3006,3004,3003,3002,3001,3010,3005') {
   throw new Error('ACC metadata rows were not included, excluded, or sorted correctly.')
 }
 report.issueTable.forEach((row) => {
@@ -159,6 +159,9 @@ if (report.issueTable.find((row) => row.id === '3002')?.workWeekClosed !== "WW32
 }
 if (report.issueTable.find((row) => row.id === '3003')?.workWeekClosed !== "WW32'2026") {
   throw new Error('A blank dedicated closure date did not fall back to Updated On.')
+}
+if (metric('total-closed') !== 3 || report.issueTable.find((row) => row.id === '3010')?.workWeekClosed !== 'Open') {
+  throw new Error('Complete was incorrectly normalized as Closed.')
 }
 if (report.filterOptions.statuses.includes('Void')) {
   throw new Error('Void leaked into the status filter options.')

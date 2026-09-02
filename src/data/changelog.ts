@@ -7,6 +7,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.2.3',
+    date: '2026-09-02T16:58:31Z',
+    type: 'fix',
+    notes: [
+      'Only the literal Closed status now counts toward Total Issues Closed, weekly closures, closure rate, and closed aging',
+      'Complete and Completed remain non-closed issues and retain Open in the Work Week Closed field',
+      'The missing-data review no longer requests a closure date for Complete or Completed issues',
+      'Manual Enrichment no longer derives historical closed dates from Complete or Completed rows',
+    ],
+  },
+  {
     version: '1.2.2',
     date: '2026-09-01T19:23:55Z',
     type: 'fix',
