@@ -7,6 +7,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.2.4',
+    date: '2026-09-15T12:25:13Z',
+    type: 'fix',
+    notes: [
+      'Current-week open issues no longer appear as gray Most Recent Open Issues in the OAC BIM Issue Detail view',
+      'Gray supplemental rows are now limited to open issues created before the current in-progress work week',
+      'Justine continues to include current-week issues as reporting activity in its previous-plus-current-week view',
+    ],
+  },
+  {
     version: '1.2.3',
     date: '2026-09-02T16:58:31Z',
     type: 'fix',

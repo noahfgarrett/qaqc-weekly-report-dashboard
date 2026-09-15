@@ -125,6 +125,9 @@ if (report.issueTable.find((row) => row.id === '100')?.group !== 'Open for Discu
 if (report.issueTable.find((row) => row.id === '104')?.status !== 'Open') {
   throw new Error('Pending did not remain an open issue in Justine mode.')
 }
+if (report.issueTable.find((row) => row.id === '104')?.group !== 'Opened in Report Week') {
+  throw new Error('Justine no longer includes current-week issues as reporting activity.')
+}
 
 const oac = buildReportModel(bundle, mergeFilters({ reportingMode: 'oac' }), now)
 if (oac.periodLabel !== "WW32'2026" || metric(oac, 'opened-week') !== 2 || metric(oac, 'closed-week') !== 1) {

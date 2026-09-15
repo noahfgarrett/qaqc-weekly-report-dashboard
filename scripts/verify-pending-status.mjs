@@ -62,6 +62,7 @@ const strictDetailBundle = {
         { ID: '1021', Status: 'Closed', 'Created On': '2026-07-24', 'Updated On': '2026-07-24', 'BIM360_Created By': 'LotusWorks', 'BIM360_Created On': '2026-07-29', 'BIM360_Closed On': '2026-07-31' },
         { ID: '1022', Status: 'Closed', 'Created On': '2026-07-24', 'Updated On': '2026-08-04', 'BIM360_Created By': 'LotusWorks', 'BIM360_Created On': '2026-07-01', 'BIM360_Closed On': '' },
         { ID: '1023', Status: 'Pending', 'Created On': '2026-07-30', 'Updated On': '2026-07-31', 'Created By': 'LotusWorks', 'BIM360_Created By': '', 'BIM360_Created On': '', 'BIM360_Closed On': '' },
+        { ID: '1024', Status: 'Open', 'Created On': '2026-08-04', 'Updated On': '2026-08-04', 'Created By': 'LotusWorks', 'BIM360_Created By': '', 'BIM360_Created On': '', 'BIM360_Closed On': '' },
         { ID: '2000', Status: 'Open', 'Created On': '2026-07-29', 'Updated On': '2026-07-31', 'Created By': 'LotusWorks', 'BIM360_Created By': 'Outside Contractor', 'BIM360_Created On': '2026-07-29', 'BIM360_Closed On': '' },
         { ID: '2001', Status: 'Open', 'Created On': '2026-07-30', 'Updated On': '2026-07-31', 'Created By': 'Outside Contractor', 'BIM360_Created By': '', 'BIM360_Created On': '', 'BIM360_Closed On': '' },
         { ID: '999', Status: 'Open', 'Created On': '2026-07-24', 'Updated On': '2026-07-31', 'BIM360_Created By': 'LotusWorks', 'BIM360_Created On': '2026-04-24', 'BIM360_Closed On': '' },
@@ -103,6 +104,9 @@ if (strictDetailReport.issueTable.find((row) => row.id === '1019')?.subtype !== 
 }
 if (strictDetailReport.issueTable.some((row) => row.id === '2000' || row.id === '2001')) {
   throw new Error('Legacy and fallback ACC ownership filters did not exclude outside issues.')
+}
+if (strictDetailReport.issueTable.some((row) => row.id === '1024')) {
+  throw new Error('A current-week open issue leaked into the gray supplemental discussion rows.')
 }
 const exportFixture = [
   ...Array.from({ length: 5 }, (_, index) => ({ ...strictDetailReport.issueTable[0], id: 'R-' + index, group: 'Opened in Report Week' })),

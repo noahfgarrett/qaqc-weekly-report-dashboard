@@ -414,6 +414,7 @@ function buildIssueTable(
       const openedInReport = isWeekInRange(issue.createdWeek, periodStart, periodEnd)
       const closedInReport = isWeekInRange(issue.closedWeek, periodStart, periodEnd)
       const closedThisWeek = issue.closedWeek?.label === currentWeek.label
+      const openedThisWeek = issue.createdWeek.label === currentWeek.label
       const createdThroughReport = compareWorkWeeks(issue.createdWeek, periodEnd) <= 0
       const isReportRow = activityWindowOnly
         ? openedInReport || closedInReport || closedThisWeek
@@ -421,7 +422,7 @@ function buildIssueTable(
           ? createdThroughReport
           : closedInReport || (closedThisWeek && compareWorkWeeks(issue.createdWeek, currentWeek) < 0)
 
-      if (!isReportRow && issue.statusKind !== 'open' && issue.statusKind !== 'pending') return
+      if (!isReportRow && (openedThisWeek || (issue.statusKind !== 'open' && issue.statusKind !== 'pending'))) return
 
       let group: IssueDetailRow['group'] = 'Open Carryover'
       if (!isReportRow) group = 'Open for Discussion'
