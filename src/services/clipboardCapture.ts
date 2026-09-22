@@ -1,4 +1,4 @@
-import html2canvas from 'html2canvas'
+import { toCanvas } from 'html-to-image'
 
 function waitForPaint(): Promise<void> {
   return new Promise((resolve) => {
@@ -10,22 +10,24 @@ async function renderElementPng(element: HTMLElement): Promise<Blob> {
   await document.fonts.ready
   await waitForPaint()
   const bounds = element.getBoundingClientRect()
-  // Keep responsive layouts identical to the live page; only crop the output.
-  const canvas = await html2canvas(element, {
+  // Copy computed styles so the browser paints shadows and charts at their live size.
+  const canvas = await toCanvas(element, {
     backgroundColor: '#ffffff',
-    scale: 3,
-    useCORS: true,
-    logging: false,
-    windowWidth: window.innerWidth,
-    windowHeight: window.innerHeight,
-    scrollX: window.scrollX,
-    scrollY: window.scrollY,
+    pixelRatio: 3,
     width: bounds.width,
     height: bounds.height,
-    onclone: (_document, clonedElement) => {
-      clonedElement.closest('.slide-frame')?.classList.remove('copy-enabled', 'copying')
+    style: {
+      position: 'relative',
+      top: '0',
+      left: '0',
+      right: 'auto',
+      bottom: 'auto',
+      margin: '0',
+      transform: 'none',
+      outline: 'none',
+      transition: 'none',
     },
-    ignoreElements: (candidate) => candidate.classList?.contains('chart-tooltip') ?? false,
+    filter: (candidate) => !candidate.classList?.contains('chart-tooltip'),
   })
   try {
     const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'))

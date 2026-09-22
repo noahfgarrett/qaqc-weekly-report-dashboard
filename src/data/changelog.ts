@@ -7,6 +7,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.3.4',
+    date: '2026-09-22T14:03:27Z',
+    type: 'fix',
+    notes: [
+      'Copied report images now retain the drop shadows on charts, cards, and the issue table',
+      'Browser-painted captures preserve chart styling and the existing white-area selection at high resolution',
+    ],
+  },
+  {
     version: '1.3.3',
     date: '2026-09-22T13:51:49Z',
     type: 'fix',
