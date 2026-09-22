@@ -1336,6 +1336,16 @@ select:disabled {
 
 .slide-frame.copy-enabled .slide-safe {
   cursor: copy;
+  outline: 3px solid transparent;
+  outline-offset: 4px;
+  transition: outline-color 120ms ease;
+}
+
+.slide-frame.copy-enabled .slide-safe:hover,
+.slide-frame.copy-enabled:has(.copy-slide-button:focus-visible) .slide-safe,
+.slide-frame.copy-enabled:has(.copy-slide-button:hover) .slide-safe,
+.slide-frame.copy-enabled.copying .slide-safe {
+  outline-color: #2684ff;
 }
 
 .copy-slide-button {

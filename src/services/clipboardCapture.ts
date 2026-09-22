@@ -9,13 +9,22 @@ function waitForPaint(): Promise<void> {
 async function renderElementPng(element: HTMLElement): Promise<Blob> {
   await document.fonts.ready
   await waitForPaint()
+  const bounds = element.getBoundingClientRect()
+  // Keep responsive layouts identical to the live page; only crop the output.
   const canvas = await html2canvas(element, {
     backgroundColor: '#ffffff',
     scale: 3,
     useCORS: true,
     logging: false,
-    windowWidth: element.scrollWidth,
-    windowHeight: element.scrollHeight,
+    windowWidth: window.innerWidth,
+    windowHeight: window.innerHeight,
+    scrollX: window.scrollX,
+    scrollY: window.scrollY,
+    width: bounds.width,
+    height: bounds.height,
+    onclone: (_document, clonedElement) => {
+      clonedElement.closest('.slide-frame')?.classList.remove('copy-enabled', 'copying')
+    },
     ignoreElements: (candidate) => candidate.classList?.contains('chart-tooltip') ?? false,
   })
   try {

@@ -7,6 +7,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.3.1',
+    date: '2026-09-22T13:27:42Z',
+    type: 'fix',
+    notes: [
+      'Hover over any report tab canvas to see a blue outline of the area that will be copied, then click once to copy it',
+      'Clipboard captures preserve the live viewport and report proportions, fixing squished charts and clipped axis labels',
+      'The blue selection outline, gray GC bars, and copy control stay out of the copied image',
+    ],
+  },
+  {
     version: '1.3.0',
     date: '2026-09-22T12:51:08Z',
     type: 'feature',

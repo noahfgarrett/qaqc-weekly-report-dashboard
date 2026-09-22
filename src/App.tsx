@@ -1124,7 +1124,6 @@ function SlideShell({
           if (target.closest('button, a, input, select, textarea, [role="button"]')) return
           void copySlideImage()
         }}
-        title={exportable ? undefined : 'Click to copy this report canvas as a high-resolution image'}
       >
         {!hideHeader && (
           <header className="slide-header">
