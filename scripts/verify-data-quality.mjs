@@ -69,6 +69,18 @@ const bundle = {
           'Due Date': '2026-09-10',
           'Created By': 'Alex LotusWorks',
         },
+        {
+          __rowNumber: 11,
+          ID: '103',
+          Status: 'Open',
+          Type: 'Coordination',
+          Title: 'Removed LotusWorks creator',
+          Contractor: '',
+          Discipline: 'BIM',
+          'Created On': '2026-08-24',
+          'Due Date': '2026-09-14',
+          'Created By': 'Samuel Leach (Removed)',
+        },
       ],
     },
     mechanical: {
@@ -94,6 +106,7 @@ const fields = audit.findings.map((finding) => finding.role + ':' + finding.rowI
 const expected = [
   'bimIssues:0:contractor',
   'bimIssues:1:closedOn',
+  'bimIssues:4:contractor',
   'mechanical:0:contractor',
   'electrical:0:inspectionPhase',
   'electrical:0:contractor',
@@ -116,7 +129,7 @@ if (audit.findings.some((finding) => ['mechanical', 'electrical'].includes(findi
   throw new Error('Inspection Subtype was incorrectly included in the correction review.')
 }
 const contractorFindings = audit.findings.filter((finding) => finding.field === 'contractor')
-if (contractorFindings.length !== 3 || contractorFindings.some((finding) => audit.initialValues[finding.id] !== 'Bechtel')) {
+if (contractorFindings.length !== 4 || contractorFindings.some((finding) => audit.initialValues[finding.id] !== 'Bechtel')) {
   throw new Error('Blank contractors were not consistently suggested as Bechtel.')
 }
 if (audit.findings.some((finding) => finding.role === 'welding' && ['contractor', 'discipline', 'subtype'].includes(finding.field))) {

@@ -237,6 +237,36 @@ if (bechtelOnly.kpis.find((item) => item.id === 'total-opened')?.rawValue !== 1)
 if (!contractorFallbackReport.filterOptions.disciplines.includes('Unassigned')) {
   throw new Error('Blank issue Discipline no longer remains available as Unassigned.')
 }
+
+const removedCreatorsBundle = {
+  ...bundle,
+  sheets: {
+    ...bundle.sheets,
+    bimIssues: {
+      id: 'removed-creators',
+      name: 'ACC Issues Export',
+      rows: [
+        { ID: '5001', Status: 'Open', 'Created On': '2026-08-05', 'Created By': 'Samuel Leach Removed)' },
+        { ID: '5002', Status: 'Pending', 'Created On': '2026-07-24', 'BIM360_Created By': 'Aaron Harwood (Removed)', 'BIM360_Created On': '2026-08-06', 'BIM360_Closed On': '' },
+        { ID: '5003', Status: 'Open', 'Created On': '2026-08-05', 'Created By': 'Outside User (Removed)' },
+      ],
+    },
+  },
+}
+const removedCreatorsReport = buildReportModel(
+  removedCreatorsBundle,
+  mergeFilters({ oac: true }),
+  new Date(2026, 7, 11, 12),
+)
+if (removedCreatorsReport.kpis.find((item) => item.id === 'total-opened')?.rawValue !== 2) {
+  throw new Error('Known removed LotusWorks creators were not included in issue metrics.')
+}
+if (removedCreatorsReport.issueTrend.find((point) => point.workWeek === "WW32'2026")?.opened !== 2) {
+  throw new Error('Known removed LotusWorks creators were not included in Issues by Work Week.')
+}
+if (removedCreatorsReport.issueTable.map((row) => row.id).join(',') !== '5002,5001') {
+  throw new Error('Known removed creators were not included, or an unknown removed creator leaked into Issue Detail.')
+}
 `
 
 try {

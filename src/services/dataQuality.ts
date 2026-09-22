@@ -1,4 +1,5 @@
 import type { SheetBundle, SheetRole } from '@/types'
+import { isLotusWorksIssueCreator } from '@/utils/issueOwnership'
 
 export type DataQualityField =
   | 'id'
@@ -157,10 +158,10 @@ function reportableIssue(row: Record<string, unknown>): boolean {
     || readValue(row, ['BIM360_Created On', 'BIM360 Created On'])
     || readValue(row, ['BIM360_Closed On', 'BIM360 Closed On']),
   )
-  if (hasLegacyData) return legacyCreatedBy.toLowerCase().includes('lotusworks')
+  if (hasLegacyData) return isLotusWorksIssueCreator(legacyCreatedBy)
   const creatorAliases = ['Created By', 'Issue Owner']
   if (!hasAnyColumn(row, creatorAliases)) return true
-  return readValue(row, creatorAliases).toLowerCase().includes('lotusworks')
+  return isLotusWorksIssueCreator(readValue(row, creatorAliases))
 }
 
 function recordLabel(role: SheetRole, row: Record<string, unknown>, rowNumber: number): string {

@@ -7,6 +7,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.2.5',
+    date: '2026-09-22T12:29:58Z',
+    type: 'fix',
+    notes: [
+      'Issues created by Samuel Leach (Removed) and Aaron Harwood (Removed) are now recognized as LotusWorks issues across every metric and report view',
+      'Both standard ACC Created By values and legacy BIM360_Created By values use the same removed-creator recognition',
+      'A centralized former-employee allowlist makes future removed LotusWorks creators a one-line addition',
+      'Unknown Removed creators remain excluded so transferred outside-company issues do not leak into reporting',
+    ],
+  },
+  {
     version: '1.2.4',
     date: '2026-09-15T12:25:13Z',
     type: 'fix',

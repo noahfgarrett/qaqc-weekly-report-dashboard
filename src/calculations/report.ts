@@ -23,6 +23,7 @@ import type {
   WorkWeek,
 } from '@/types'
 import { compactNumber, deltaLabel, percent } from '@/utils/format'
+import { isLotusWorksIssueCreator } from '@/utils/issueOwnership'
 import {
   compareWorkWeeks,
   daysBetween,
@@ -132,9 +133,9 @@ function shouldIncludeIssue(row: Record<string, unknown>): boolean {
   if (!hasLegacyData) {
     const standardCreatorAliases = ['Created By', 'Issue Owner']
     if (!hasColumn(row, standardCreatorAliases)) return true
-    return value(row, standardCreatorAliases).toLowerCase().includes('lotusworks')
+    return isLotusWorksIssueCreator(value(row, standardCreatorAliases))
   }
-  return legacyCreatedBy.toLowerCase().includes('lotusworks')
+  return isLotusWorksIssueCreator(legacyCreatedBy)
 }
 
 function normalizeIssue(row: Record<string, unknown>): IssueRecord {
