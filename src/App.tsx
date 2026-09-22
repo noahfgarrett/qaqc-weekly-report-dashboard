@@ -9,6 +9,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ClipboardCheck,
+  Copy,
   Download,
   FileSpreadsheet,
   Filter,
@@ -51,6 +52,7 @@ import {
   type PreparedIssueWorkbook,
 } from '@/services/manualIssuesUpdate'
 import { clearLegacyConnectionData, loadFilters, saveFilters } from '@/services/storage'
+import { copyElementAsPng } from '@/services/clipboardCapture'
 import { checkForUpdate } from '@/services/updateChecker'
 import { downloadUpdateFile } from '@/services/updateDownload'
 import type {
@@ -1058,15 +1060,72 @@ function SlideShell({
   className?: string
   headerExtra?: React.ReactNode
 }) {
+  const copyTargetRef = useRef<HTMLDivElement>(null)
+  const resetCopyStateRef = useRef<number | null>(null)
+  const [copyState, setCopyState] = useState<'idle' | 'copying' | 'copied' | 'error'>('idle')
+
+  useEffect(() => () => {
+    if (resetCopyStateRef.current !== null) window.clearTimeout(resetCopyStateRef.current)
+  }, [])
+
+  async function copySlideImage(): Promise<void> {
+    if (exportable || copyState === 'copying' || !copyTargetRef.current) return
+    if (resetCopyStateRef.current !== null) window.clearTimeout(resetCopyStateRef.current)
+    setCopyState('copying')
+    try {
+      await copyElementAsPng(copyTargetRef.current)
+      setCopyState('copied')
+    } catch {
+      setCopyState('error')
+    }
+    resetCopyStateRef.current = window.setTimeout(() => setCopyState('idle'), 2200)
+  }
+
+  const copyLabel = copyState === 'copying'
+    ? 'Copying'
+    : copyState === 'copied'
+      ? 'Copied'
+      : copyState === 'error'
+        ? 'Copy failed'
+        : 'Copy image'
+  const CopyIcon = copyState === 'copied'
+    ? CheckCircle2
+    : copyState === 'error'
+      ? AlertCircle
+      : copyState === 'copying'
+        ? RefreshCw
+        : Copy
+
   return (
     <section
-      className={cx('slide-frame', hideHeader && 'headerless', className)}
+      className={cx('slide-frame', hideHeader && 'headerless', !exportable && 'copy-enabled', copyState === 'copying' && 'copying', className)}
       aria-label={title}
       {...(exportable ? { 'data-export-slide': true } : {})}
     >
       <div className="gc-guard top" />
       <div className="gc-guard bottom" />
-      <div className="slide-safe">
+      {!exportable && (
+        <button
+          className={cx('copy-slide-button', copyState)}
+          type="button"
+          onClick={() => void copySlideImage()}
+          disabled={copyState === 'copying'}
+          title="Copy the report canvas without the gray GC bars"
+        >
+          <CopyIcon className={cx(copyState === 'copying' && 'spin')} size={14} />
+          {copyLabel}
+        </button>
+      )}
+      <div
+        className="slide-safe"
+        ref={copyTargetRef}
+        onClick={exportable ? undefined : (event) => {
+          const target = event.target as HTMLElement
+          if (target.closest('button, a, input, select, textarea, [role="button"]')) return
+          void copySlideImage()
+        }}
+        title={exportable ? undefined : 'Click to copy this report canvas as a high-resolution image'}
+      >
         {!hideHeader && (
           <header className="slide-header">
             <div>

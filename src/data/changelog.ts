@@ -7,6 +7,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.3.0',
+    date: '2026-09-22T12:51:08Z',
+    type: 'feature',
+    notes: [
+      'Clicking any visible report canvas now copies that slide content directly to the clipboard as a high-resolution PNG',
+      'Clipboard images exclude the gray GC bars and outer frame so they can be pasted directly into PowerPoint',
+      'A compact Copy image control provides Copying, Copied, and failure feedback without appearing in the captured image',
+      'Issue Detail pagination controls remain interactive and do not trigger a clipboard capture',
+    ],
+  },
+  {
     version: '1.2.5',
     date: '2026-09-22T12:29:58Z',
     type: 'fix',
