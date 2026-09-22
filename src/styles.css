@@ -1418,9 +1418,14 @@ select:disabled {
 }
 
 .slide-safe.copy-surface {
+  top: 7.6%;
+  bottom: 7.2%;
   left: 0;
   right: 0;
   padding-inline: 4.2%;
+  /* Percentage padding uses width; convert the added height for the 16:9 frame. */
+  padding-top: 0.225%;
+  padding-bottom: 1.2375%;
 }
 
 .slide-header {

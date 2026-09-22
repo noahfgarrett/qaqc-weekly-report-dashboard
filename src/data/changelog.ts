@@ -7,6 +7,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.3.3',
+    date: '2026-09-22T13:51:49Z',
+    type: 'fix',
+    notes: [
+      'The snip outline and copied image now include the full white area vertically, stopping at the gray bars',
+      'Added top and bottom white margins preserve the existing chart layout',
+    ],
+  },
+  {
     version: '1.3.2',
     date: '2026-09-22T13:47:29Z',
     type: 'fix',
