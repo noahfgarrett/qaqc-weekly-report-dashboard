@@ -7,6 +7,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.3.2',
+    date: '2026-09-22T13:47:29Z',
+    type: 'fix',
+    notes: [
+      'The blue snip selection and copied image now extend to both edges of the white report area, including the side margins',
+      'Capture height and chart positions stay the same, and clicking the white side margins also copies the report',
+    ],
+  },
+  {
     version: '1.3.1',
     date: '2026-09-22T13:27:42Z',
     type: 'fix',

@@ -1117,7 +1117,7 @@ function SlideShell({
         </button>
       )}
       <div
-        className="slide-safe"
+        className={cx('slide-safe', !exportable && 'copy-surface')}
         ref={copyTargetRef}
         onClick={exportable ? undefined : (event) => {
           const target = event.target as HTMLElement

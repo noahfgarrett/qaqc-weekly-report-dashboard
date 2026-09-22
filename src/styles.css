@@ -1337,7 +1337,7 @@ select:disabled {
 .slide-frame.copy-enabled .slide-safe {
   cursor: copy;
   outline: 3px solid transparent;
-  outline-offset: 4px;
+  outline-offset: -3px;
   transition: outline-color 120ms ease;
 }
 
@@ -1415,6 +1415,12 @@ select:disabled {
   right: 4.2%;
   top: 8%;
   z-index: 2;
+}
+
+.slide-safe.copy-surface {
+  left: 0;
+  right: 0;
+  padding-inline: 4.2%;
 }
 
 .slide-header {
