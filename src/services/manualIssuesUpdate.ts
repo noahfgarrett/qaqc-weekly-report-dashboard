@@ -2,6 +2,7 @@ import * as XLSX from 'xlsx'
 import { parseDate } from '@/utils/workWeeks'
 
 export type ManualIssueWorkbookKind = 'current' | 'acc'
+export type EnrichedIssueFormat = 'xlsx' | 'csv'
 export type ManualIssueField = 'id' | 'contractor' | 'discipline'
 export type EnrichedIssueField = 'contractor' | 'discipline' | 'createdBy' | 'createdOn' | 'closedOn' | 'dueDate'
 
@@ -453,15 +454,39 @@ function ensureEnrichmentColumn(
   return column
 }
 
-function enrichedFileName(fileName: string): string {
+function enrichedFileName(fileName: string, format: EnrichedIssueFormat): string {
   const stem = fileName.replace(/\.[^.]+$/, '') || 'ACC-Issues-Export'
   const date = new Date().toISOString().slice(0, 10)
-  return `${stem}-Enriched-${date}.xlsx`
+  return `${stem}-Enriched-${date}.${format}`
+}
+
+function writeIssueCsv(worksheet: XLSX.WorkSheet, headerRow: number): ArrayBuffer {
+  const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1')
+  range.s.r = headerRow
+  while (range.s.c < range.e.c && isBlank(worksheet[XLSX.utils.encode_cell(range.s)]?.v)) {
+    range.s.c += 1
+  }
+  const values: XLSX.WorkSheet = { '!ref': XLSX.utils.encode_range(range) }
+
+  for (const [address, cell] of Object.entries(worksheet)) {
+    if (address.startsWith('!') || cell?.v == null || cell.t === 'z') continue
+    const value = cell.t === 's' ? String(cell.v) : XLSX.utils.format_cell(cell)
+    // A CSV reader may treat formula-shaped text as executable even inside quotes.
+    const formulaLike = cell.t === 's' && /^[\s]*[=+@-]/.test(value)
+    values[address] = { t: 's', v: formulaLike ? `'${value}` : value }
+  }
+
+  return new TextEncoder().encode(XLSX.utils.sheet_to_csv(values, {
+    blankrows: false,
+    forceQuotes: true,
+    RS: '\r\n',
+  })).buffer
 }
 
 export function buildUpdatedIssueWorkbook(
   acc: PreparedIssueWorkbook,
   analysis: ManualIssueAnalysis,
+  format: EnrichedIssueFormat = 'xlsx',
 ): UpdatedIssueWorkbook {
   const workbook = XLSX.read(acc.data, {
     type: 'array',
@@ -516,6 +541,10 @@ export function buildUpdatedIssueWorkbook(
     }
   }
 
+  if (format === 'csv') {
+    return { fileName: enrichedFileName(acc.fileName, format), bytes: writeIssueCsv(worksheet, acc.headerRow) }
+  }
+
   const output = XLSX.write(workbook, {
     type: 'array',
     bookType: 'xlsx',
@@ -527,14 +556,16 @@ export function buildUpdatedIssueWorkbook(
   }) as ArrayBuffer
 
   return {
-    fileName: enrichedFileName(acc.fileName),
+    fileName: enrichedFileName(acc.fileName, format),
     bytes: output,
   }
 }
 
 export function downloadUpdatedIssueWorkbook(output: UpdatedIssueWorkbook): void {
   const blob = new Blob([output.bytes], {
-    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    type: output.fileName.endsWith('.csv')
+      ? 'text/csv;charset=utf-8'
+      : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   })
   const url = URL.createObjectURL(blob)
   const anchor = document.createElement('a')

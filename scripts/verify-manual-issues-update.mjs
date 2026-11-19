@@ -144,12 +144,12 @@ XLSX.utils.sheet_add_aoa(importSheet, [
   ['Issue ID', 'Contractor', 'Discipline', 'Updated On'],
   [{ t: 's', v: 'BIM-100', f: '"BIM-100"' }, '', '', { t: 'd', v: new Date('2026-03-01T08:30:00Z'), z: 'General' }],
   [],
-  ['BIM-101', '', ''],
+  ['BIM-101', '', '', 'Line 1, with "quotes"\\nLine 2'],
   [{ t: 'n', v: 42, z: '00000' }, '', ''],
   ['=HYPERLINK("https://example.test/old", "BIM-102")', '', ''],
   [{ t: 'n', f: 'HYPERLINK("https://example.test/new","BIM-103")' }, '', ''],
   [{ t: 's', v: 'BIM-104', l: { Target: 'https://example.test/linked' } }, '', ''],
-  ['="BIM-105"', '', ''],
+  ['="BIM-105"', '', '', '=1+1'],
 ], { origin: 'B3' })
 XLSX.utils.book_append_sheet(importWorkbook, importSheet, 'Issues')
 const importSource = XLSX.write(importWorkbook, { type: 'array', bookType: 'xlsx', bookSST: true, cellDates: true })
@@ -178,6 +178,20 @@ const zip = unzipSync(new Uint8Array(importOutput.bytes))
 const xml = strFromU8(zip['xl/worksheets/sheet1.xml'])
 if (!zip['xl/sharedStrings.xml'] || !xml.includes('t="s"') || xml.includes('t="str"') || xml.includes('<f') || xml.includes('<hyperlink') || xml.includes('t="d"')) {
   throw new Error('The export must use shared strings, literal IDs, and numeric date serials.')
+}
+
+const smartsheetCsv = buildUpdatedIssueWorkbook(importAcc, reconcileIssueRows(current, importAcc), 'csv')
+const csvText = new TextDecoder().decode(smartsheetCsv.bytes)
+const csvSheet = XLSX.read(csvText, { type: 'string', raw: true }).Sheets.Sheet1
+const csvRows = XLSX.utils.sheet_to_json(csvSheet, { defval: '', raw: true })
+if (!smartsheetCsv.fileName.endsWith('.csv') || !csvText.startsWith('"Issue ID",') || csvRows.length !== 7) {
+  throw new Error('Smartsheet CSV header or row count is wrong: ' + csvRows.length + ' rows; ' + csvText.split('\\r\\n')[0])
+}
+if (csvRows.map(row => row['Issue ID']).join(',') !== 'BIM-100,BIM-101,00042,BIM-102,BIM-103,BIM-104,BIM-105') {
+  throw new Error('Smartsheet CSV changed formula-derived IDs or leading zeros.')
+}
+if (csvRows[0]['Due Date'] !== '4/1/2026' || csvRows[1]['Updated On'] !== 'Line 1, with "quotes"\\nLine 2' || csvRows[6]['Updated On'] !== "'=1+1") {
+  throw new Error('Smartsheet CSV changed date formats, multiline text, or formula escaping.')
 }
 
 const csv = await prepareIssueWorkbook(new File(['ID,Contractor,Discipline\\n00042,Trade A,Electrical'], 'ACC.csv'), 'acc')

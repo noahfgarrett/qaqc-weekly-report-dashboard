@@ -47,6 +47,7 @@ import {
   prepareIssueWorkbook,
   reconcileIssueRows,
   type EnrichedIssueField,
+  type EnrichedIssueFormat,
   type ManualIssueEnrichment,
   type ManualIssueWorkbookKind,
   type PreparedIssueWorkbook,
@@ -1666,11 +1667,11 @@ function ManualIssuesUpdate() {
     }
   }
 
-  function downloadUpdatedLog(): void {
+  function downloadUpdatedLog(format: EnrichedIssueFormat): void {
     if (!acc || !analysis) return
     setError(null)
     try {
-      const output = buildUpdatedIssueWorkbook(acc, analysis)
+      const output = buildUpdatedIssueWorkbook(acc, analysis, format)
       downloadUpdatedIssueWorkbook(output)
       setDownloadedFile(output.fileName)
     } catch (err) {
@@ -1799,12 +1800,20 @@ function ManualIssuesUpdate() {
                   Review Fills
                 </button>
                 <button
-                  className="button primary"
+                  className="button secondary"
                   type="button"
-                  onClick={downloadUpdatedLog}
+                  onClick={() => downloadUpdatedLog('xlsx')}
                 >
                   <Download size={16} />
-                  Download Enriched ACC
+                  Excel
+                </button>
+                <button
+                  className="button primary"
+                  type="button"
+                  onClick={() => downloadUpdatedLog('csv')}
+                >
+                  <Download size={16} />
+                  Smartsheet CSV
                 </button>
               </div>
             </div>
@@ -1907,12 +1916,20 @@ function ManualIssuesUpdate() {
               )}
               <button className="button secondary" type="button" onClick={() => setSummaryOpen(false)}>Close</button>
               <button
-                className="button primary"
+                className="button secondary"
                 type="button"
-                onClick={downloadUpdatedLog}
+                onClick={() => downloadUpdatedLog('xlsx')}
               >
                 <Download size={16} />
-                Download Enriched ACC
+                Excel
+              </button>
+              <button
+                className="button primary"
+                type="button"
+                onClick={() => downloadUpdatedLog('csv')}
+              >
+                <Download size={16} />
+                Smartsheet CSV
               </button>
             </div>
           </div>

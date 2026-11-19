@@ -882,8 +882,9 @@ select:disabled {
 
 .manual-results-actions {
   display: flex;
-  flex: 0 0 auto;
+  flex-wrap: wrap;
   gap: 8px;
+  justify-content: flex-end;
 }
 
 .manual-table-scroll {
@@ -1157,6 +1158,7 @@ select:disabled {
   align-items: center;
   border-top: 1px solid var(--border);
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   justify-content: flex-end;
   padding-top: 14px;

@@ -7,6 +7,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.3.7',
+    date: '2026-11-19T14:06:55Z',
+    type: 'fix',
+    notes: [
+      'Manual Issues Update offers a Smartsheet CSV download to bypass Excel workbook repair errors',
+      'The CSV keeps enriched values and plain issue IDs, with the Excel workbook available separately',
+    ],
+  },
+  {
     version: '1.3.6',
     date: '2026-11-19T13:55:45Z',
     type: 'fix',
