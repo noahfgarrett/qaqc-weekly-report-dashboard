@@ -121,6 +121,8 @@ function inspectWorksheet(
   worksheetName: string,
   worksheet: XLSX.WorkSheet,
 ): WorksheetCandidate | null {
+  const ref = worksheet['!ref']
+  if (!ref) return null
   const matrix = XLSX.utils.sheet_to_json<unknown[]>(worksheet, {
     header: 1,
     defval: '',
@@ -128,25 +130,27 @@ function inspectWorksheet(
   })
   if (matrix.length === 0) return null
 
+  const start = XLSX.utils.decode_range(ref).s
   let best: WorksheetCandidate | null = null
-  matrix.slice(0, 30).forEach((headers, headerRow) => {
+  matrix.slice(0, 30).forEach((headers, index) => {
+    const headerRow = start.r + index
     const fieldHeaders: Partial<Record<ManualIssueField, string>> = {}
     const fieldColumns: Partial<Record<ManualIssueField, number>> = {}
     ISSUE_FIELDS.forEach((field) => {
       const match = findHeader(headers, field.aliases)
       if (!match) return
       fieldHeaders[field.key] = match.name
-      fieldColumns[field.key] = match.column
+      fieldColumns[field.key] = start.c + match.column
     })
     const score = Object.keys(fieldHeaders).length * 100
     if (best && best.score >= score) return
 
-    const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet, {
+    const rows = XLSX.utils.sheet_to_json<Record<string, unknown> & { __rowNum__: number }>(worksheet, {
       range: headerRow,
       defval: '',
       raw: true,
       blankrows: false,
-    }).map((row, index) => ({ ...row, __rowNumber: headerRow + index + 2 }))
+    }).map((row) => ({ ...row, __rowNumber: row.__rowNum__ + 1 }))
 
     best = {
       worksheetName,
@@ -189,6 +193,7 @@ export async function prepareIssueWorkbook(
       type: 'array',
       cellDates: true,
       cellStyles: true,
+      raw: extension(file.name) === '.csv',
     })
   } catch {
     throw new Error(`${file.name}: the spreadsheet could not be read.`)
@@ -370,9 +375,17 @@ function cloneStyle<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T
 }
 
+function dateNumberFormat(format: XLSX.CellObject['z']): string {
+  return typeof format === 'string' && XLSX.SSF.is_date(format) ? format : 'm/d/yyyy'
+}
+
 function makeCell(value: string | Date, template?: XLSX.CellObject): XLSX.CellObject {
   const cell: XLSX.CellObject = value instanceof Date
-    ? { t: 'd', v: value, z: template?.z || 'm/d/yyyy' }
+    ? {
+        t: 'd',
+        v: new Date(Date.UTC(value.getFullYear(), value.getMonth(), value.getDate())),
+        z: dateNumberFormat(template?.z),
+      }
     : { t: 's', v: value }
   if (template?.s) cell.s = cloneStyle(template.s)
   if (template?.z && !(value instanceof Date)) cell.z = template.z
@@ -424,7 +437,9 @@ export function buildUpdatedIssueWorkbook(
   const workbook = XLSX.read(acc.data, {
     type: 'array',
     cellDates: true,
+    cellNF: true,
     cellStyles: true,
+    raw: extension(acc.fileName) === '.csv',
   })
   const worksheet = workbook.Sheets[acc.worksheetName]
   if (!worksheet) throw new Error('The ACC Issues Export worksheet is no longer available.')
@@ -452,10 +467,32 @@ export function buildUpdatedIssueWorkbook(
     })
   })
 
+  const idColumn = XLSX.utils.encode_col(acc.fieldColumns.id)
+  const lastRow = XLSX.utils.decode_range(worksheet['!ref'] || 'A1').e.r
+  for (let row = acc.headerRow + 1; row <= lastRow; row += 1) {
+    const address = idColumn + XLSX.utils.encode_row(row)
+    const cell: XLSX.CellObject | undefined = worksheet[address]
+    if (!cell) continue
+    if (cell.t === 'e' || ((cell.f || cell.F) && (cell.v == null || cell.v === ''))) {
+      throw new Error(`${address}: the Issue ID has no usable value. Replace it with the plain-text ID and try again.`)
+    }
+    if (cell.v == null) continue
+    const value = cell.t === 'n' && /^0{2,}$/.test(String(cell.z ?? '')) ? cell.w ?? cell.v : cell.v
+    worksheet[address] = { t: 's', v: String(value), z: '@' }
+  }
+
+  for (const sheet of Object.values(workbook.Sheets)) {
+    for (const cell of Object.values(sheet)) {
+      if (cell?.t === 'd') cell.z = dateNumberFormat(cell.z)
+    }
+  }
+
   const output = XLSX.write(workbook, {
     type: 'array',
     bookType: 'xlsx',
-    cellDates: true,
+    // Use shared strings and numeric date serials for Excel and Smartsheet compatibility.
+    bookSST: true,
+    cellDates: false,
     cellStyles: true,
     compression: true,
   }) as ArrayBuffer

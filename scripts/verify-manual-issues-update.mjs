@@ -12,6 +12,7 @@ const outputDirectory = resolve(temporaryDirectory, 'dist')
 const entrySource = `
 import { File } from 'node:buffer'
 import * as XLSX from ${JSON.stringify(resolve(root, 'node_modules/xlsx/xlsx.mjs'))}
+import { strFromU8, unzipSync } from ${JSON.stringify(resolve(root, 'node_modules/fflate/esm/index.mjs'))}
 import {
   buildUpdatedIssueWorkbook,
   prepareIssueWorkbook,
@@ -135,6 +136,44 @@ if (!output.fileName.startsWith('ACC_Issues_Export-Enriched-') || !output.fileNa
 }
 if (acc.rows[0]['Responsible Contractor'] !== '' || acc.rows[0].Trade !== '') {
   throw new Error('The in-memory ACC source model was mutated.')
+}
+
+const importWorkbook = XLSX.utils.book_new()
+const importSheet = XLSX.utils.aoa_to_sheet([])
+XLSX.utils.sheet_add_aoa(importSheet, [
+  ['Issue ID', 'Contractor', 'Discipline', 'Updated On'],
+  [{ t: 's', v: 'BIM-100', f: '"BIM-100"' }, '', '', { t: 'd', v: new Date('2026-03-01T08:30:00Z'), z: 'General' }],
+  [],
+  ['BIM-101', '', ''],
+  [{ t: 'n', v: 42, z: '00000' }, '', ''],
+], { origin: 'B3' })
+XLSX.utils.book_append_sheet(importWorkbook, importSheet, 'Issues')
+const importSource = XLSX.write(importWorkbook, { type: 'array', bookType: 'xlsx', bookSST: true, cellDates: true })
+const importAcc = await prepareIssueWorkbook(new File([importSource], 'ACC.xlsx'), 'acc')
+const importOutput = buildUpdatedIssueWorkbook(importAcc, reconcileIssueRows(current, importAcc))
+const importResult = XLSX.read(importOutput.bytes, { cellNF: true, cellDates: true }).Sheets.Issues
+for (const [address, id] of [['B4', 'BIM-100'], ['B6', 'BIM-101'], ['B7', '00042']]) {
+  const cell = importResult[address]
+  if (cell?.t !== 's' || cell.v !== id || cell.z !== '@' || cell.f || cell.F) {
+    throw new Error(address + ' was not exported as a literal text ID.')
+  }
+}
+if (importResult.C4?.v !== 'Old Trade' || importResult.C5 || importResult.C6?.v !== 'Trade A') {
+  throw new Error('Enrichment shifted columns or rows around the blank row.')
+}
+if (importResult.E4?.v?.toISOString() !== '2026-03-01T08:30:00.000Z') {
+  throw new Error('An existing date with General formatting lost its date or time.')
+}
+const zip = unzipSync(new Uint8Array(importOutput.bytes))
+const xml = strFromU8(zip['xl/worksheets/sheet1.xml'])
+if (!zip['xl/sharedStrings.xml'] || !xml.includes('t="s"') || xml.includes('t="str"') || xml.includes('<f') || xml.includes('t="d"')) {
+  throw new Error('The export must use shared strings, literal IDs, and numeric date serials.')
+}
+
+const csv = await prepareIssueWorkbook(new File(['ID,Contractor,Discipline\\n00042,Trade A,Electrical'], 'ACC.csv'), 'acc')
+const csvOutput = buildUpdatedIssueWorkbook(csv, reconcileIssueRows(current, csv))
+if (XLSX.read(csvOutput.bytes).Sheets.Sheet1.A2?.v !== '00042') {
+  throw new Error('A CSV ID lost its leading zeros.')
 }
 `
 

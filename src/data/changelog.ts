@@ -7,6 +7,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.3.5',
+    date: '2026-11-19T13:37:24Z',
+    type: 'fix',
+    notes: [
+      'Enriched issue exports use standard Excel date cells and shared strings for Smartsheet import compatibility',
+      'Issue IDs export as plain text, preserving leading zeros and using saved values in place of ID formulas',
+      'Enrichment stays aligned to the correct rows when the source sheet contains blank lines',
+    ],
+  },
+  {
     version: '1.3.4',
     date: '2026-09-22T14:03:27Z',
     type: 'fix',
