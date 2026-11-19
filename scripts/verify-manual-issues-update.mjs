@@ -146,15 +146,22 @@ XLSX.utils.sheet_add_aoa(importSheet, [
   [],
   ['BIM-101', '', ''],
   [{ t: 'n', v: 42, z: '00000' }, '', ''],
+  ['=HYPERLINK("https://example.test/old", "BIM-102")', '', ''],
+  [{ t: 'n', f: 'HYPERLINK("https://example.test/new","BIM-103")' }, '', ''],
+  [{ t: 's', v: 'BIM-104', l: { Target: 'https://example.test/linked' } }, '', ''],
+  ['="BIM-105"', '', ''],
 ], { origin: 'B3' })
 XLSX.utils.book_append_sheet(importWorkbook, importSheet, 'Issues')
 const importSource = XLSX.write(importWorkbook, { type: 'array', bookType: 'xlsx', bookSST: true, cellDates: true })
 const importAcc = await prepareIssueWorkbook(new File([importSource], 'ACC.xlsx'), 'acc')
 const importOutput = buildUpdatedIssueWorkbook(importAcc, reconcileIssueRows(current, importAcc))
 const importResult = XLSX.read(importOutput.bytes, { cellNF: true, cellDates: true }).Sheets.Issues
-for (const [address, id] of [['B4', 'BIM-100'], ['B6', 'BIM-101'], ['B7', '00042']]) {
+for (const [address, id] of [
+  ['B4', 'BIM-100'], ['B6', 'BIM-101'], ['B7', '00042'], ['B8', 'BIM-102'],
+  ['B9', 'BIM-103'], ['B10', 'BIM-104'], ['B11', 'BIM-105'],
+]) {
   const cell = importResult[address]
-  if (cell?.t !== 's' || cell.v !== id || cell.z !== '@' || cell.f || cell.F) {
+  if (cell?.t !== 's' || cell.v !== id || cell.z !== '@' || cell.f || cell.F || cell.l) {
     throw new Error(address + ' was not exported as a literal text ID.')
   }
 }
@@ -164,9 +171,12 @@ if (importResult.C4?.v !== 'Old Trade' || importResult.C5 || importResult.C6?.v 
 if (importResult.E4?.v?.toISOString() !== '2026-03-01T08:30:00.000Z') {
   throw new Error('An existing date with General formatting lost its date or time.')
 }
+if (importResult.D8?.v !== 'Mechanical' || importResult.C9?.v !== 'Trade C') {
+  throw new Error('Wrapped IDs were not normalized before matching historical issues.')
+}
 const zip = unzipSync(new Uint8Array(importOutput.bytes))
 const xml = strFromU8(zip['xl/worksheets/sheet1.xml'])
-if (!zip['xl/sharedStrings.xml'] || !xml.includes('t="s"') || xml.includes('t="str"') || xml.includes('<f') || xml.includes('t="d"')) {
+if (!zip['xl/sharedStrings.xml'] || !xml.includes('t="s"') || xml.includes('t="str"') || xml.includes('<f') || xml.includes('<hyperlink') || xml.includes('t="d"')) {
   throw new Error('The export must use shared strings, literal IDs, and numeric date serials.')
 }
 
@@ -174,6 +184,14 @@ const csv = await prepareIssueWorkbook(new File(['ID,Contractor,Discipline\\n000
 const csvOutput = buildUpdatedIssueWorkbook(csv, reconcileIssueRows(current, csv))
 if (XLSX.read(csvOutput.bytes).Sheets.Sheet1.A2?.v !== '00042') {
   throw new Error('A CSV ID lost its leading zeros.')
+}
+
+const unknownFormula = await prepareIssueWorkbook(new File(['ID,Contractor,Discipline\\n=SUM(A5),Trade A,Electrical'], 'ACC.csv'), 'acc')
+try {
+  buildUpdatedIssueWorkbook(unknownFormula, reconcileIssueRows(current, unknownFormula))
+  throw new Error('An unreadable ID formula passed through the export.')
+} catch (error) {
+  if (!/!A2: the Issue ID formula/.test(error.message)) throw error
 }
 `
 

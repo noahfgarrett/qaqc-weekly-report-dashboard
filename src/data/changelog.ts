@@ -7,6 +7,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.3.6',
+    date: '2026-11-19T13:55:45Z',
+    type: 'fix',
+    notes: [
+      'Manual Issues Update extracts IDs from Autodesk hyperlink formulas, including formulas stored as text',
+      'Issue matching uses the plain IDs and exports them without formulas or links',
+      'Unreadable ID formulas identify the affected worksheet and cell before export',
+    ],
+  },
+  {
     version: '1.3.5',
     date: '2026-11-19T13:37:24Z',
     type: 'fix',

@@ -82,6 +82,28 @@ function idKey(value: unknown): string {
   return String(value ?? '').trim().toLowerCase()
 }
 
+function literalIssueId(cell: XLSX.CellObject | undefined): string | null {
+  if (!cell) return ''
+
+  const value = cell.t === 'n' && /^0{2,}$/.test(String(cell.z ?? '')) ? cell.w ?? cell.v : cell.v
+  const storedText = String(value ?? '')
+  const text = storedText.trim()
+  const formulaText = text.replace(/^'\s*(?==)/, '')
+  // Extract constant labels without evaluating the link or any workbook formula.
+  for (const expression of [cell.f, formulaText.startsWith('=') ? formulaText : undefined]) {
+    if (!expression) continue
+    const literal = /^=?\s*"((?:[^"]|"")*)"\s*$/.exec(expression)
+    const link = /^=?\s*(?:_xlfn\.)?HYPERLINK\s*\(\s*"(?:[^"]|"")*"\s*[,;]\s*(?:"((?:[^"]|"")*)"|(\d+))\s*\)\s*$/i.exec(expression)
+    const label = (literal?.[1] ?? link?.[1] ?? link?.[2])?.replace(/""/g, '"').trim()
+    if (label && !label.startsWith('=') && label.toUpperCase() !== '#UNPARSEABLE') return label
+  }
+
+  // SheetJS can represent a formula without a cached result as numeric zero.
+  if (cell.t === 'e' || formulaText.startsWith('=') || text.toUpperCase() === '#UNPARSEABLE'
+    || ((cell.f || cell.F) && (!text || cell.v === 0))) return null
+  return storedText
+}
+
 function isBlank(value: unknown): boolean {
   return value === null || value === undefined || String(value).trim() === ''
 }
@@ -192,7 +214,9 @@ export async function prepareIssueWorkbook(
     workbook = XLSX.read(data, {
       type: 'array',
       cellDates: true,
+      cellNF: true,
       cellStyles: true,
+      sheetStubs: true,
       raw: extension(file.name) === '.csv',
     })
   } catch {
@@ -207,6 +231,11 @@ export async function prepareIssueWorkbook(
   const candidate = candidates[0]
   if (!candidate) throw new Error(`${file.name}: no populated worksheet was found.`)
   const fields = requireFieldMap(candidate, file.name)
+  const worksheet = workbook.Sheets[candidate.worksheetName]
+  const rows = candidate.rows.map((row) => {
+    const address = XLSX.utils.encode_cell({ r: Number(row.__rowNumber) - 1, c: fields.columns.id })
+    return { ...row, [fields.headers.id]: literalIssueId(worksheet[address]) ?? '' }
+  })
 
   return {
     kind,
@@ -215,7 +244,7 @@ export async function prepareIssueWorkbook(
     rowCount: candidate.rows.length,
     headerRow: candidate.headerRow,
     data,
-    rows: candidate.rows,
+    rows,
     fieldHeaders: fields.headers,
     fieldColumns: fields.columns,
   }
@@ -439,6 +468,7 @@ export function buildUpdatedIssueWorkbook(
     cellDates: true,
     cellNF: true,
     cellStyles: true,
+    sheetStubs: true,
     raw: extension(acc.fileName) === '.csv',
   })
   const worksheet = workbook.Sheets[acc.worksheetName]
@@ -473,12 +503,11 @@ export function buildUpdatedIssueWorkbook(
     const address = idColumn + XLSX.utils.encode_row(row)
     const cell: XLSX.CellObject | undefined = worksheet[address]
     if (!cell) continue
-    if (cell.t === 'e' || ((cell.f || cell.F) && (cell.v == null || cell.v === ''))) {
-      throw new Error(`${address}: the Issue ID has no usable value. Replace it with the plain-text ID and try again.`)
+    const id = literalIssueId(cell)
+    if (id === null) {
+      throw new Error(`${acc.worksheetName}!${address}: the Issue ID formula has no usable ID. Replace the cell with its plain-text ID and try again.`)
     }
-    if (cell.v == null) continue
-    const value = cell.t === 'n' && /^0{2,}$/.test(String(cell.z ?? '')) ? cell.w ?? cell.v : cell.v
-    worksheet[address] = { t: 's', v: String(value), z: '@' }
+    if (id || cell.t !== 'z') worksheet[address] = { t: 's', v: id, z: '@' }
   }
 
   for (const sheet of Object.values(workbook.Sheets)) {
